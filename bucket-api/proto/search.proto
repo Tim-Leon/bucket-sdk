@@ -1,0 +1,78 @@
+syntax = "proto3";
+package backend_api;
+
+import "google/protobuf/timestamp.proto";
+
+message SearchForBucketsRequest {
+    string query = 1;
+    optional uint32 offset = 2;
+    optional uint32 count = 3;
+    optional string author_id = 4;
+    optional string bucket_type = 15;
+    repeated string tags = 12;
+    optional string encryption = 13;
+    optional bool is_nsfw = 14;
+    optional google.protobuf.Timestamp modified_before = 5;
+    optional google.protobuf.Timestamp modified_after = 6;
+    optional google.protobuf.Timestamp uploaded_before = 7;
+    optional google.protobuf.Timestamp uploaded_after = 8;
+    optional uint64 min_size =9;
+    optional uint64 max_size =10;
+    optional string visibility = 11;
+    optional bool is_cloneable = 16;
+    optional bool is_searchable = 17;
+    optional bool is_encrypted = 18;
+    optional bool is_password_protected = 19;
+    optional string storage_class = 20;
+}
+
+message BucketView {
+    string name = 1;
+    string storage_class = 2;
+    uint64 size_in_bytes = 3;
+    bool is_password_protected = 4;
+    bool is_encrypted = 5;
+    bool is_nsfw = 6;
+    bool is_searchable = 7;
+    string owner_user_id = 8;
+    optional string description = 9;
+}
+
+message SearchForBucketsResponse {
+    optional uint32 offset = 1;
+    optional uint32 count = 2;
+    repeated BucketView buckets = 3;
+}
+
+message SearchInBucketRequest
+{
+    string bucket_id = 1;
+    string bucket_owner_id = 2;
+    string query = 3;
+    optional uint32 offset = 4;
+    optional uint32 count = 5;
+    optional google.protobuf.Timestamp modified_before = 6;
+    optional google.protobuf.Timestamp modified_after = 7;
+    optional google.protobuf.Timestamp uploaded_before = 8;
+    optional google.protobuf.Timestamp uploaded_after = 9;
+    optional uint64 min_size = 10;
+    optional uint64 max_size = 11;
+    optional string directory = 12;
+    optional string file_extension = 13;
+}
+
+message BucketFileView {
+    string filename = 1;
+    string file_extension = 2;
+    string directory = 3;
+    uint64 size = 4;
+    google.protobuf.Timestamp createdAt = 5;
+    google.protobuf.Timestamp modifiedAt = 6;
+}
+
+message SearchInBucketResponse {
+    optional uint32 offset =1;
+    optional uint32 count = 2;
+    repeated BucketFileView files = 3;
+}
+

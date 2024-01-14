@@ -1,0 +1,176 @@
+syntax = "proto3";
+package backend_api;
+import "google/protobuf/timestamp.proto";
+
+/// This sets the public signing key that can be used by Client-Side-Encryption for others to verify the signature.
+/// This is used in the case of the clients not even trusting the servers then they can exchange this signing key in a secure way and verify the user upload is correct.
+/// Setting this key will not affect the server side encryption.
+/// And setting it more than once will overwrite the previous key if version is the same, only recommended to set it once while setting up the account.
+/// Before overwriting the key is is recommender to save the key somewhere as all content in the account will have the wrong signature.
+/// Feature still in development.
+message SigningKey {
+    string version = 1; /// The encryption version. This API only supports version 1 for now.
+    bytes public_signing_key = 2; /// The users securely generated public signing key.
+}
+
+message UpdateAccountRequest {
+    optional string user_id = 1; // If None then default to JWT tokens user_id will be used.
+    optional string username = 2;
+    optional string email = 3;
+    optional string password = 4;
+    optional uint64 cost_limit = 5;
+    optional uint64 storage_limit_bytes = 6;
+    optional string payment_plan = 7;
+    optional string payment_amount = 8;
+    optional string preferred_language = 9;
+    optional string bio = 10;
+    optional string preferred_payment_method = 11;
+    optional string preferred_currency = 12;
+    optional SigningKey public_signing_key = 13;
+    optional uint32 verifications = 14; /// Enable/Disable verification methods such as TOTP, Phone.
+}
+
+message UpdateAccountResponse {
+
+}
+
+
+//-------------TOTP START-------------//
+
+// User sends TOTP Setup request.
+// Server returns users TOTP Secret.
+// User use secret to generate current TOTP code to verify that they have the secret.
+message SetupTotpStartRequest {
+
+}
+
+message SetupTotpStartResponse {
+    bytes totp_secret = 1; // Sets the totp secrets to enable 2-FA
+}
+
+message SetupTotpFinishRequest {
+    string totp_code = 1; // The code that is generated from TOTP secret.
+}
+
+message SetupTotpFinishResponse {
+
+}
+//-------------TOTP END-------------//
+
+
+message DeleteAccountRequest {
+    string user_id = 1;
+}
+
+message DeleteAccountResponse {
+    optional string user_id_str = 1;
+}
+
+message AddCreditsToBucketRequest {
+    string bucket_id = 1;
+    uint32 credits = 2;
+}
+
+message AddCreditsToBucketResponse {
+
+}
+
+message SetApiSettingsRequest {
+    bool api_is_enable = 1; /// Disabled by default. Use this request with parameter set as true.
+}
+
+/// To globaly enable or disable API for user, In case the API is compromised this can be used.
+/// Will be disabled by default to reduce security footprint.
+message SetApiSettingsResponse {
+    bool api_is_enable = 1;
+}
+
+message CreateNewApiKeyRequest {
+    optional google.protobuf.Timestamp expires_at = 1; /// ISO 8601 format.
+    string role = 2; /// 'client-to-api', 'server-to-api' or 'api'. 'client-to-api' by default. client and server denomonation are used depending on trust level. If it's client directory to our server use 'client-to-server'.
+    string permission = 3; /// What the API is permitted to do. This include all the endpoints specified in json format.
+    repeated string bucket_id = 4; /// If the API is only allowed to access a set of specific bucket, leave empty for all.
+    repeated string user_id = 5; /// If the API is only allowed to access a set of buckets from a specific user or all, all referring to the current user and buckets that are shared with the user, leave empty for all.
+    optional string webhook_url = 6; /// The endpoint of the webhook must be a url.
+    optional bytes metadata = 7; /// Metadata to be stored with the API key.
+}
+
+message CreateNewApiKeyResponse {
+    string api_token = 1; /// Will be a jwt token with role of 'api'.
+}
+
+/// User is not allowed to specify any webhook as this could be used to DOS another site.
+/// The user need to verify that they own the webhook domain.
+message RegisterWebhookRequest {
+    string webhook_url = 1;
+    string protocol = 2;
+}
+
+message DeleteWebhookRequest {
+    string webhook_url = 1;
+}
+
+
+
+/// If both field are empty, it will assume the user is requesting for his own account details.
+/// Some information such as email are never returned when requesting for other accounts.
+message GetAccountDetailsRequest {
+    oneof user {
+        string user_id = 1;
+        string username = 2;
+    }
+}
+
+message GetAccountDetailsResponse {
+    string user_id = 1;
+    string username = 2;
+    optional string email = 3;
+    optional string role = 4;
+    /// decimal
+    optional string total_cost = 5;
+    /// decimal
+    optional string cost_limit = 6;
+    /// decimal
+    optional string balance = 7;
+    optional uint32 verification_flag = 8; /// flag uint
+    optional uint32 bucket_count = 9;
+    optional uint64 total_storage_bytes = 10;
+    optional uint64 storage_limit_bytes = 11;
+    optional string payment_plan = 12;
+    optional string payment_amount = 13; /// Only when using monthly billing will this value be present.
+    optional bool is_api_enabled = 14;
+    optional string preferred_language = 15;
+    optional string bio = 16;
+}
+
+/// Used to create payment checkout for a user. User will get a link in response, re-directing them to our payment provider.
+message CreateCheckoutRequest {
+    string payment_model = 1;
+    bool change_payment_model = 2; // If this request is allowed to change payment model. Should be false by default.
+}
+
+message CreateCheckoutResponse {
+    string url_redirection = 1;
+}
+
+// After each signup an email to the user is sent to verify the email address.
+// If this email sent is lost, the user can request a new email to be sent using this request.
+// Will not work if the account is already specified as a verified account.
+message GetNewEmailVerificationRequest {
+    optional string new_email = 1;
+}
+
+message GetNewEmailVerificationResponse {
+    /// "Email already verified"
+    optional string email = 1;
+}
+
+/// Will send email to user, for account recovery purposes.
+message AccountRecoveryRequest {
+    string email = 1;
+}
+
+message AccountRecoveryResponse {
+    
+}
+

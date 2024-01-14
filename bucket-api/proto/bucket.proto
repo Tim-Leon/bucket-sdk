@@ -1,0 +1,370 @@
+syntax = "proto3";
+package backend_api;
+import "google/protobuf/timestamp.proto";
+
+
+/// The default encryption algorithm is Server AES-256.
+/// - Custom
+/// Theses are the official pre-defined encryption algorithms/encryption-protocols that can be used.
+/// If the user wish to use a custom encryption algorithm they can do so by specifying "Custom-X", where X is the algorithm.
+/// Server will not accept none pre-defined value if Custom is not specified in the beginning. This is to reserve future official algorithms.
+/// If customs are used, the user will not be able to view the file contents on the website.
+/// Use None for non-important data that doesn't need to be encrypted.
+/// Note: This enum should not be used directly in messages, but rather the string value of the enum to keep it more modular.
+// enum BucketEncryption {
+//   None = 0;
+//   Server_AES256 = 1;
+//   Client_ZeroKnowledgeV1_AES256GCM = 2;
+//   Client_AES256GCM = 3;
+// }
+
+
+message GetRegionsClustersRequest {
+    string region = 1;
+    string cluster = 2;
+}
+
+message RegionClusters {
+    string region = 1;
+    repeated uint32 cluster = 2;
+    repeated uint32 cluster_size = 3;
+}
+
+message GetRegionsClustersResponse {
+    repeated RegionClusters region_clusters = 1;
+}
+
+message BucketRedundancy {
+    /// Which region:site will be used for site replication.
+    repeated string replication_region_sites = 1;
+    /// Will store x-number of archives of the data.
+    optional uint32 archive_redundancies = 2;
+    /// When the archive will be scheduled to happen.
+    optional uint32 archive_scheduler_redundancy_sec = 3;
+}
+
+message CreateBucketRequest {
+  string name = 1;
+  // Public,PrivateShared, Private,
+  optional string visibility = 2;
+  // The encryption algorithm used for the bucket. Currently only supports AES-256.
+  optional string encryption = 3;
+  /// Set the bucket to be password protected. All users who wish to access the bucket are required to enter the password.
+  /// The field doesn't affect encryption, only access control.
+  optional string password = 4;
+  /// Redundancy settings TODO: Currently not supported.
+  // optional BucketRedundancy redundancy = 5;
+  // Optional description of the bucket.
+  optional string description = 8;
+  // Storage class, Standard. Will later support Performant(That will use SSD or NVME?), Extra-Performant(NVME) with super fast ethernet.
+  string storage_class = 9;
+  // Tag the storage, like pictures, music, videos, etc.
+  repeated string tags = 10;
+  // When the bucket will expire.
+  optional google.protobuf.Timestamp expires_timestamp = 11;
+  // Expected size of the bucket, in bytes.
+  optional uint64 expected_capacity_in_bytes = 12;
+  bool is_nsfw = 13;
+  // If the bucket is searchable or not, Will end up costing more.
+  bool is_searchable = 14;
+  /// If the user is allowed to clone and distribute the same content. If this value is false for a bucket assume it's not okay to redustribute.
+  bool is_bucket_cloneable = 15;
+  /// If the bucket is non-sharable it will use zero-knowledge encryption.
+  bool is_sharable = 16;
+  /// Pay upfront for the bucket capacity.
+  bool is_prepaid = 17;
+  /// Compression on bucket level. All files stored in the bucket is assumed to use this compression.
+  /// Support both client and server side compression.
+  optional string bucket_compression = 18;
+}
+
+// Region:Site does not
+message CreateBucketResponse {
+  string bucket_id = 1;
+  string bucket_owner_id = 2;
+}
+
+message DeleteBucketRequest {
+  string bucket_id = 1;
+  string bucket_owner_id = 2;
+}
+
+message DeleteBucketResponse {
+  string bucket_id = 1;
+  string bucket_owner_id = 2;
+}
+/// Used for updating the bucket metadata. Such as redundancy, encryption, etc.
+/// This api endpoint will be updated in the future to support more options and is not priority yet because of being complicated.
+message UpdateBucketRequest {
+  string bucket_id = 1;
+  string bucket_user_id = 2;
+
+  optional string name = 3;
+  // Public,PrivateShared, Private,
+  optional string visibility = 4;
+  // The encryption algorithm used for the bucket. Currently only supports AES-256.
+  optional string encryption = 5;
+  /// Set the bucket to be password protected. All users who wish to access the bucket are required to enter the password.
+  /// This only applies to bucket with visibility set to non-"pirvate".
+  /// The field dosn't matter for encryption.
+  optional string password = 6;
+  /// The pre-allocated capacity of the bucket, in bytes.
+  optional uint64 pre_allocated_capacity_in_bytes = 7;
+  /// Redundancy settings TODO: Currently not supported.
+  optional BucketRedundancy redundancy = 8;
+  // Currently only option is EU-Central-1:1, can also ignore site, With the format "Region-Datacenter:Cluster", each region can have multiple clusters/datacenters multiple clusters can share the same datacenter. the user is able to replicate data amongs them. Each cluster will have a max available space. Space will be exapanded according to needs but might take a while.
+  optional string region_cluster = 9;
+  // Optional description of the bucket.
+  optional string description = 10;
+  // Storage class, Standard. Will later support Performant(That will use SSD or NVME?), Extra-Performant(NVME) with super fast ethernet.
+  optional string storage_class = 11;
+  // Tag the storage, like pictures, music, videos, etc.
+  repeated string opt_tags = 12;
+  // When the bucket will expire. Dosn't matter if it's .
+  optional google.protobuf.Timestamp expires_timestamp = 13;
+  // Expected size of the bucket, in bytes.
+  optional uint64 expected_size_in_bytes = 14;
+  optional bool is_nsfw = 15;
+  // If the bucket is searchable or not, Will end up costing more.
+  optional bool is_searchable = 16;
+
+  optional bool is_bucket_cloneable = 17;
+  /// If the bucket is non-sharable it will use zero-knowledge encryption.
+  optional bool is_sharable = 18;
+  /// Bucket compression used, will not convert the compression for present data.
+  /// The conversion between compression has to be used individually.
+  optional string bucket_compression = 19;
+}
+
+message UpdateBucketResponse {
+
+}
+
+message MoveFilesInBucketRequest {
+    string from_bucket_id = 1;
+    string from_bucket_owner_id = 2;
+    repeated string from_filepaths = 3;
+
+    string to_bucket_id = 4;
+    optional string to_bucket_owner_id = 5;
+    string to_directory = 6;
+    /// Will remove the capacity form the bucket of x amount of bytes.
+    /// Default this should be true in most cases.
+    /// Only false if the user intends to keep the storage to be uploaded to later on...
+    bool is_capacity_destructive = 7;
+}
+
+message MoveFilesInBucketResponse {
+  repeated string failed_file_paths = 1;
+}
+
+/**
+* Copy files in a bucket, can copy to another users bucket if the permission allows it.
+* Should ignore to_bucket_owner_id for all user owned buckets.
+*/
+message CopyFilesInBucketRequest {
+    string from_bucket_id = 1;
+    string from_bucket_owner_id = 2;
+    repeated string from_filepaths = 3;
+
+    string to_bucket_id = 4;
+    optional string to_bucket_owner_id = 5;
+
+    string to_directory = 6;
+  }
+
+  message CopyFilesInBucketResponse {
+    repeated string failed_file_paths = 1;
+  }
+
+  /**
+  * Clone a bucket, will copy all the files from the bucket to the new bucket.
+  * Will fail if bucket_owner_id is not the same as the user performing the action, because of name collision.
+  * Recommend settings new_bucket_name to something new.
+  */
+  message CloneBucketRequest {
+    string from_bucket_id = 1;
+    string from_bucket_owner_id = 2;
+
+    optional string new_bucket_name = 3;
+    optional string new_bucket_type = 4;
+    optional string new_bucket_encryption = 5;
+    optional string new_bucket_password = 6;
+  }
+
+  message CloneBucketResponse {
+
+  }
+
+
+message DeleteFilesInBucketRequest {
+    string bucket_id = 1;
+    string bucket_owner_id = 2;
+    repeated string filepaths = 3;
+    /// Will remove the capacity form the bucket of x amount of bytes.
+    /// Default this should be true in most cases.
+    /// Only false if the user intneds to keep the storage to be uploaded to later on...
+    bool is_capacity_destructive = 7;
+}
+
+message DeleteFilesInBucketResponse {
+    repeated string failed_file_paths = 1;
+}
+message BucketDetails {
+  string bucket_id = 1;
+  string owner_user_id = 10;
+  string name = 3;
+  string storage_class = 2;
+  uint64 size_in_bytes = 4;
+  optional string encryption = 5;
+  bool is_password_protected = 6;
+  bool is_nsfw = 7;
+  bool is_searchable = 8;
+  bool is_shared = 9;
+  optional string description = 11;
+  google.protobuf.Timestamp creation_date = 12;
+  google.protobuf.Timestamp modified_date = 13;
+  string visibility = 14;
+  uint64 bucket_download_count = 15; /// How many times the bucket has been downloaded.
+  uint64 file_download_count = 16; /// How many files has been downloaded.
+  bool is_prepaid = 17; /// If the entire bucket is already payed for, refer to expires field for when the bucket is removed.
+  optional google.protobuf.Timestamp expires = 18; // When the bucket will expire. WILL be present if is_prepaid = true.
+}
+
+message GetBucketDetailsFilter {
+  bool include_name = 1;
+  bool include_storage_class = 2;
+  bool include_size_in_bytes = 3;
+  bool include_encryption = 4;
+  bool include_is_password_protected = 5;
+  bool include_is_nsfw = 6;
+  bool include_is_searchable = 7;
+  bool include_is_shared = 8;
+  bool include_owner_user_id = 10;
+  bool include_description = 11;
+  bool include_creation_date = 12;
+  bool include_modified_date = 13;
+  bool include_visibility = 14;
+  bool include_bucket_download_count = 16;
+  bool include_bucket_file_download_count = 17;
+}
+
+message GetBucketDetailsRequest {
+  repeated string opt_bucket_ids = 1; // Optional, if empty will get all of users buckets, that are public or private if authorized.
+  string bucket_owner_id = 2;
+
+  optional uint32 offset = 3;
+  optional uint32 limit = 4; //
+  optional GetBucketDetailsFilter filter = 5;
+}
+
+message GetBucketDetailsFromUrlRequest {
+    string url = 1;
+}
+
+message GetBucketDetailsFromUrlResponse {
+    BucketDetails buckets = 1;
+}
+
+message GetBucketDetailsResponse {
+  repeated BucketDetails buckets = 1;
+}
+
+message DownloadBucketRequest {
+  string bucket_id = 1;
+  string bucket_owner_id = 2;
+  /// Only required if the file is password protected.
+  optional string hashed_password = 3;
+  /// ZIP, RAR, RAW
+  optional string format = 4;
+}
+
+message DownloadBucketResponse {
+  DownloadFilesResponse file = 1;
+  uint32 offset = 2;
+  uint32 size = 3;
+}
+
+
+
+message GetFileDetailsRequest {
+  string bucket_id = 1;
+  string bucket_owner_id = 2;
+  repeated string file_paths = 3;
+}
+
+message GetFileDetailsResponse {
+  uint32 file_size_in_bytes = 1;
+  string file_format = 2;
+}
+
+/// Use stream?
+message DownloadFilesRequest {
+  message File {
+    string file_path = 1;
+    uint32 size_in_bytes = 2;
+  }
+  string bucket_id = 1;
+  string bucket_owner_id = 2;
+  /// Which files to download, and size to determine if its a multipart upload or a singed url only.
+  repeated File files = 3;
+  optional string hashed_password = 4;
+}
+
+message DownloadFilesResponse {
+  message FilepathUrlMap {
+    string file_path = 1;
+    string download_url = 2;
+    uint64 file_size_in_bytes = 3;
+  }
+  // Url to where the file should be downloaded from.
+  repeated FilepathUrlMap filepaths = 1;
+}
+
+// Use Stream?
+/// Upload a file to a bucket. Can be empty file or a file with terabytes of data.
+message UploadFilesToBucketRequest {
+  message File {
+    string file_path = 1;
+    uint64 size_in_bytes = 2;
+  }
+  string target_bucket_id = 1;
+  string target_bucket_owner_id = 2;
+  /// Will offset all of the paths.
+  string target_directory = 3;
+  repeated File source_files = 4;
+  uint64 part_size_limit_in_bytes = 5; ///???? NEED???? If the file is larger than this it will be split into multiple parts. Each part of this size. This is because the browsers limit the size of file in memory leading to multiple requests.
+  uint64 total_size_in_bytes = 6; /// Total size in bytes might be should be the total the user wish to upload.
+  optional string hashed_password = 7;
+}
+
+/// The response will at most return 5 upload urls per request.
+/// The client might have to make multiple request to upload all files especially if the size is over 5 GiB.
+message UploadFilesToBucketResponse {
+  message FilepathUrlMap {
+    string file_path = 1;
+    repeated string upload_urls = 2; // Might use multipart upload and will then create multiple urls for a single file. These are in correct order.
+    bool continuing_upload = 3; // If the upload is continuing from a previous upload.
+    uint64 file_size_in_bytes = 4;
+  }
+  // Url to where the file should be uploaded to.
+  repeated FilepathUrlMap filepaths = 2;
+  // Upload can not excede this limit, is just a suggestion to client., but if it does exceeded the limit it will abort unless space auto adjust is enabled.
+  uint64 size_in_bytes_limit = 3;
+}
+
+
+
+
+/// If a 3rd part chose to use this API they can use this API to avoid having the client first send the upload to the 3rd-party-server and then to our server.
+/// Use JWT-token for client authentication
+/// Upload policy? How long the upload is valid for? How much? 
+message RegisterEventWebHook {
+  string webhook_url = 1; // The url to send the event to. Must verify that the URL belongs to the user.
+  string user_id = 3;
+  repeated string bucket_id = 2;
+}
+/// Returns a JWT-token with authentication.
+message CreateClientUpload {
+
+}

@@ -1,0 +1,48 @@
+syntax = "proto3";
+package backend_api;
+
+// Representation of filesystem.
+message File {
+    // The name of the file.
+    string name = 1;
+    // The size of the file in bytes.
+    int64 size = 2;
+    // Type of file. .exe, .txt, .png, etc.
+    string file_format = 3;
+    // The content of the file.
+    // bytes content = 4;
+}
+
+message Directory {
+    // The name of the directory.
+    string name = 1;
+    // The files in the directory.
+    repeated File files = 2;
+    // The subdirectories in the directory.
+    repeated Directory subdirectories = 3;
+}
+
+// A Filesystem is created for each Bucket.
+// The filesystem is stored on disk. And load into memory on request.
+message Filesystem {
+  // The root directory of the filesystem.
+    Directory root = 1;
+}
+
+message GetBucketFilestructureRequest {
+    // The name of the bucket.
+    string bucket_id = 1;
+    // Bucket owner id.
+    optional string bucket_owner_id = 2;
+    // The directory to start the query from.
+    optional string start_directory = 3;
+    // Used to query the continuation from last request.
+    optional string continuation_token = 4;
+}
+
+message GetBucketFilestructureResponse {
+    // The filesystem of the bucket.
+    Filesystem filesystem = 1;
+    // Used to query the continuation from last request.
+    optional string continuation_token = 2;
+}

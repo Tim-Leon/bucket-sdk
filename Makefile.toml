@@ -1,0 +1,10 @@
+[tasks.git-submodules-update]
+command="git"
+args=["submodule", "update", "--remote", "--force", "--rebase", "--init"]
+
+[tasks.cargo-update]
+command = "cargo"
+args = ["update"]
+
+[tasks.build]
+dependencies = ["git-submodules-update"]

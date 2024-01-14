@@ -1,0 +1,94 @@
+syntax = "proto3";
+package backend_api;
+import "google/protobuf/timestamp.proto";
+// Creates a bucket share link. This link can be either SecretShareLink or a normal ShareLink, depending on if is_secret_share_link.
+message CreateBucketShareLinkRequest{
+  string user_id = 1;
+  string bucket_id = 2;
+  optional google.protobuf.Timestamp expires = 3;
+  optional uint32 usages = 4;
+  bool registered_users_only = 5;
+  bool view_permission = 6;
+  bool read_permission = 7;
+  bool write_permission = 8;
+  bool delete_file_permission = 9;
+  bool delete_bucket_permission = 10;
+  bool share_bucket_permission = 11;
+  bool clone_permission = 12;
+  bool search_permission = 13;
+  bool is_secret_share_link = 14;
+}
+
+message CreateBucketShareLinkResponse {
+  string url = 1;
+}
+
+message GetBucketShareLinksRequest {
+  string bucket_id = 1;
+}
+
+message GetBucketShareLinksResponse {
+  repeated string secret_share_link_urls = 1;
+  repeated string share_link_urls = 2;
+}
+
+message DeleteBucketShareLinksRequest {
+  repeated string urls = 1;
+}
+
+message DeleteBucketShareLinksResponse {
+  repeated string urls = 1;
+}
+
+message DeleteUserFromSharedBucketRequest {
+  string bucket_id = 1;
+  repeated string user_ids = 2;
+}
+
+message DeleteUserFromSharedBucketResponse {
+}
+
+message SharedUser {
+  string user_id = 1;
+  bool read_premission = 2;
+  bool write_permission = 3;
+  bool view_permission = 4;
+  bool copy_permission = 5;
+  string username = 6;
+  string email = 7;
+}
+
+message GetBucketSharedUsersRequest {
+  string bucket_id = 1;
+}
+
+
+message GetBucketSharedUsersResponse {
+  string owner_id = 1;
+  string owner_username = 2;
+  repeated SharedUser shared_users = 3;
+}
+
+message GetUserBucketPermissionsRequest {
+  string bucket_id = 1;
+  string user_id = 2;
+}
+
+message GetUserBucketPermissionsResponse {
+  optional bool read_permission = 1;
+  optional bool write_permission = 2;
+  optional bool view_permission = 3;
+  optional bool copy_permission = 4;
+}
+
+message InviteUserToBucketRequest {
+  oneof user {
+    string user_id = 1;
+    string email = 2;
+    string username = 3;
+  }
+}
+
+message InviteUserToBucketResponse {
+
+}

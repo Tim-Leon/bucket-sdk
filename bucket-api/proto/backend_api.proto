@@ -1,0 +1,81 @@
+syntax = "proto3";
+import "auth.proto";
+import "bucket.proto";
+import "bucket_permission.proto";
+import "account.proto";
+import "search.proto";
+import "filesystem.proto";
+import "sync.proto";
+package backend_api;
+
+//Error model that is used is: https://cloud.google.com/apis/design/errors
+// Creating a new account, and signing in is all defined in "auth.proto".
+// bucket.proto defines all the bucket related operations
+// search.proto defines all the search related operations
+// account.proto contains account related operations
+// filesystem.proto contains file-structure definition.
+
+// www.com/username/bucket_name/file_name
+// www.com/username/share/bucket_name/secure_hash
+
+// User/Root
+// Bucket Sharable.
+// Folder
+// File
+//
+service BackendApi {
+  // Auth
+  rpc CreateAccountStart(CreateAccountStartRequest) returns (CreateAccountStartResponse) {};
+  rpc CreateAccountFinish(CreateAccountFinishRequest) returns (CreateAccountFinishResponse) {};
+
+  rpc AccountLoginStart(AccountLoginStartRequest) returns (AccountLoginStartResponse) {};
+  rpc AccountLoginFinish(AccountLoginFinishRequest) returns (AccountLoginFinishResponse) {};
+
+  rpc AccountLogout(AccountLogoutRequest) returns (AccountLogoutResponse) {};
+  // Account
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse) {};
+  rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {};
+  // rpc GetNewEmailVerification(GetNewEmailVerificationRequest) returns (GetNewEmailVerificationResponse) {};
+  rpc GetAccountDetails(GetAccountDetailsRequest) returns (GetAccountDetailsResponse) {};
+  //rpc AccountRecovery(AccountRecoveryRequest) returns (AccountRecoveryResponse) {};
+
+  rpc CreateCheckout(CreateCheckoutRequest) returns (CreateCheckoutResponse) {};
+  // api
+  rpc SetApiSettings(SetApiSettingsRequest) returns (SetApiSettingsResponse) {};
+  rpc CreateNewApiKey(CreateNewApiKeyRequest) returns (CreateNewApiKeyResponse) {}
+  // create/delete
+  rpc CreateBucket(CreateBucketRequest) returns (CreateBucketResponse) {};
+  rpc DeleteBucket(DeleteBucketRequest) returns (DeleteBucketResponse) {};
+  rpc UpdateBucket(UpdateBucketRequest) returns (UpdateBucketResponse) {};
+  // Upload
+  rpc UploadFilesToBucket(UploadFilesToBucketRequest) returns (UploadFilesToBucketResponse) {};
+  // Download
+  rpc DownloadFiles(DownloadFilesRequest) returns (stream DownloadFilesResponse) {};
+  rpc DownloadBucket(DownloadBucketRequest) returns (stream DownloadBucketResponse) {};
+  // Bucket/File-Info
+  // rpc GetFileDetails(GetFileDetailsRequest) returns (GetFileDetailsResponse) {};
+  rpc GetBucketDetails(GetBucketDetailsRequest) returns(GetBucketDetailsResponse) {};
+  rpc GetBucketDetailsFromUrl(GetBucketDetailsFromUrlRequest) returns (GetBucketDetailsFromUrlResponse) {};
+  rpc GetBucketFilestructure(GetBucketFilestructureRequest) returns (GetBucketFilestructureResponse) {};
+  // Search
+  rpc SearchInBucket(SearchInBucketRequest) returns (SearchInBucketResponse) {};
+  rpc SearchForBuckets(SearchForBucketsRequest) returns (SearchForBucketsResponse) {};
+
+  // Bucket file operations delete/move/copy/clone
+  rpc DeleteFilesInBucket(DeleteFilesInBucketRequest) returns (DeleteFilesInBucketResponse) {};
+  rpc MoveFilesInBucket(MoveFilesInBucketRequest) returns (MoveFilesInBucketResponse) {};
+  rpc CopyFilesInBucket(CopyFilesInBucketRequest) returns (CopyFilesInBucketResponse) {};
+  // rpc CloneBucket(CloneBucketRequest) returns (CloneBucketResponse) {};
+
+  // Bucket Sync
+  // rpc BucketSyncStart(BucketSyncStartRequest) returns (stream BucketSyncStartResponse) {};
+  // rpc BucketSyncCancel(BucketSyncCancelRequest) returns (BucketSyncCancelResponse) {};
+
+  // Bucket Permissions. share-link.
+  // rpc InviteUserToBucket(InviteUserToBucketRequest) returns (InviteUserToBucketResponse) {}; // Used by Share-File system to invite a user.
+  rpc CreateBucketShareLink(CreateBucketShareLinkRequest) returns (CreateBucketShareLinkResponse) {}; // Used by user who have an account. Provide read/write access to bucket for an etirity.
+  // rpc DeleteUserFromSharedBucket(DeleteUserFromSharedBucketRequest) returns (DeleteUserFromSharedBucketResponse) {}; /// Used by Share-File system to delete a user.
+  // rpc DeleteBucketShareLinks(DeleteBucketShareLinksRequest) returns (DeleteBucketShareLinksResponse) {};
+  // rpc GetBucketSharedUsers(GetBucketSharedUsersRequest) returns (GetBucketSharedUsersResponse) {};
+  // rpc GetUserBucketPermissions(GetUserBucketPermissionsRequest) returns (GetUserBucketPermissionsResponse) {};
+}

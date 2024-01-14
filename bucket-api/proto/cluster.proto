@@ -1,0 +1,71 @@
+syntax = "proto3";
+package backend_api;
+
+/// Cluster ID's are unique combined with region ID, Cluster ID's are not unique across regions.
+/// All Regions Cluster ID's start from 0 and counts up 0..2..3..
+/// Each cluster is limited by Size, and Bandwidth. Hence user is able to get remaining size and bandwidth for each cluster.
+/// Size could be used to determine if upload will fit, or if cluster has enough to replicate data...
+/// The bandwidth determine the current load of the cluster, Each cluster is shared between multiple users.
+/// Depending on the usage the bandwidth will change.
+/// Size and Bandwidth are physical restraints that need manual intervention to upgrade.
+/// Size and Bandwidth are upgraded when the cluster reach close to full capacity or the bandwidth is maxed out.
+
+
+message ClusterRequirements {
+  optional uint64 size_in_bytes = 1;
+  optional uint64 bandwidth_in_bytes = 2;
+}
+
+message RegionRequirements {
+  optional uint64 size_in_bytes = 1;
+  optional uint64 bandwidth_in_bytes = 2;
+}
+
+message GetRegionDetailsRequest {
+  repeated string opt_region = 1; //Optional
+  optional RegionRequirements region_requirements = 2;
+}
+
+// Size
+// Prefered
+// Bandwith.
+
+message RegionDetails {
+  optional uint32 amount_of_clusters = 1;
+  optional uint64 region_total_size = 2;
+  optional uint64 region_remaining_size = 3;
+  repeated uint32 cluster_id_order_by_preference = 5; // Returns all cluster id's in the region ordered by preference.
+}
+
+message GetRegionDetailsResponse {
+  repeated RegionDetails regions = 1;
+}
+
+/**
+* This request will get the details of a region and what cluster to use, with the option to get details about a specific cluster.
+* The response contains 2 repeated fields, one for the preferred cluster and one for all optional specified clusters in cluster_id of the request.
+* Use the preferred cluster if you want to upload a file to the region as this cluster likely has the most space or the best performance.
+*/
+message GetRegionClusterDetailsRequest {
+  string region = 1;
+  repeated uint32 cluster_id = 2; /// Optional
+  optional ClusterRequirements cluster_requirements = 3;
+}
+
+message ClusterDetails {
+  uint32 cluster_id = 1;
+  uint64 total_size_in_bytes = 2;
+  uint64 remaining_size_in_bytes = 3;
+  uint64 total_bandwidth_in_bytes = 4;
+  uint64 remaining_bandwidth_in_bytes = 5; /// This value is j́ust the current bandwidth usage, and will change very often hence should not be the main consideration when chosing a cluster.
+}
+
+message GetRegionClusterDetailsResponse {
+  repeated ClusterDetails cluster_details = 1;
+}
+
+// message GetRegionOrClusterDetailsResponse {
+//     RegionDetails region_details = 1;
+//     repeated ClusterDetails prefered_cluster_details = 2;
+//     repeated ClusterDetails cluster_details = 3;
+// }
