@@ -220,18 +220,18 @@ impl BucketFileTrait for VirtualNativeBucketFile {
     }
 }
 
-/// Virtual files can either be in the cloud, or on the device. If they are already on the device the NativeBucketFile will be used.
-pub enum VirtualBucketFile {
-    WebBucketFile(VirtualFileDetails, VirtualWebBucketFile),
-    NativeBucketFile(VirtualFileDetails, VirtualNativeBucketFile),
-}
-//https://stackoverflow.com/questions/49186751/sharing-a-common-value-in-all-enum-values
-impl Deref for VirtualBucketFile {
-    type Target = VirtualFileDetails;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            VirtualBucketFile::WebBucketFile(n, _) => n,
-            VirtualBucketFile::NativeBucketFile(n, _) => n,
-        }
-    }
-}
+// Virtual files can either be in the cloud, or on the device. If they are already on the device the NativeBucketFile will be used.
+// pub enum VirtualFileDetails {
+//     WebBucketFile(VirtualFileDetails, VirtualWebBucketFile),
+//     NativeBucketFile(VirtualFileDetails, VirtualNativeBucketFile),
+// }
+// //https://stackoverflow.com/questions/49186751/sharing-a-common-value-in-all-enum-values
+// impl Deref for VirtualFileDetails {
+//     type Target = VirtualFileDetails;
+//     fn deref(&self) -> &Self::Target {
+//         match self {
+//             VirtualFileDetails::WebBucketFile(n, _) => n,
+//             VirtualFileDetails::NativeBucketFile(n, _) => n,
+//         }
+//     }
+// }

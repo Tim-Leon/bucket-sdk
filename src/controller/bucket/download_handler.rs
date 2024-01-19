@@ -1,11 +1,11 @@
 use crate::controller::bucket::errors::BucketDownloadHandlerErrors;
-use crate::encryption_v1::module::{DecryptionModule, ZeroKnowledgeDecryptionModuleV1, EncryptionModule};
+use crate::encryption_v1::module::{
+    DecryptionModule, EncryptionModule, ZeroKnowledgeDecryptionModuleV1,
+};
 use async_trait::async_trait;
 use bucket_common_types::BucketEncryption;
 use gloo::file::Blob;
 use mime::Mime;
-
-use super::io::file::VirtualBucketFile;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BucketUploadHandlerErrors {}

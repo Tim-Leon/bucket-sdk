@@ -102,12 +102,14 @@ pub async fn upload_files_to_bucket<FileHandle>(
     Ok(())
 }
 
-pub async fn download_from_url(
+pub async fn download_from_url<DH: BucketFileDownloadHandler + Clone, T>(
     client: &mut QueryClient,
     url: ExclusiveShareLink,
     hashed_password: Option<String>,
     format: Option<DownloadFormat>,
-    download_handler: BucketFileDownloadHandlerDyn,
+    //download_handler: DH,
+    create_download_handler: impl CreateFileDownloadHandler<DH, T>,
+    additional_param: Box<T>,
 ) -> Result<(), DownloadError> {
     let bucket_details = match url {
         //(user_id, bucket_id)
@@ -130,8 +132,6 @@ pub async fn download_from_url(
             )
             .await
             .map_err(|_x| DownloadError::BucketNotFound)?;
-
-            
 
             detail.buckets
         }
@@ -163,38 +163,61 @@ pub async fn download_from_url(
         },
     };
 
-    bucket_download(
+    bucket_download::<DH, T>(
         client,
         bucket_download_req,
         true,
-        &mut download_handler.clone(),
+        create_download_handler,
+        additional_param,
     )
     .await?;
     Ok(())
 }
+
 #[derive(thiserror::Error, Debug)]
 pub enum DownloadFilesFromBucketError {
     #[error("on download finish error")]
-    DonwloadFinishError(Box<dyn Error>),
-
-    #[error(transparent)]
-    DownloadFromUrlError(#[from] DownloadFromUrlError),
+    DownloadFinishError(Box<dyn Error + 'static>),
 }
 
 impl From<BucketDownloadHandlerErrors> for DownloadFilesFromBucketError {
     fn from(value: BucketDownloadHandlerErrors) -> Self {
-        BucketDownloadHandlerErrors::DownloadFromUrlError(Box::new(value))
+        DownloadFilesFromBucketError::DownloadFinishError(Box::new(value))
     }
 }
 
-pub async fn download_files_from_bucket<DecryptionModule>(
+pub trait CreateFileDownloadHandler<DH: BucketFileDownloadHandler, T> {
+    fn handle(
+        &self,
+        virtual_file: super::io::file::VirtualFileDetails,
+        keep_file_structure: bool,
+        additional_param: Box<T>,
+    ) -> DH;
+}
+
+// Example implementation of CreateFileDownloadHandler for a specific closure type
+impl<F, DH: BucketFileDownloadHandler, T> CreateFileDownloadHandler<DH, T> for F
+where
+    F: Fn(super::io::file::VirtualFileDetails, bool, Box<T>) -> DH,
+{
+    fn handle(
+        &self,
+        virtual_file: super::io::file::VirtualFileDetails,
+        keep_file_structure: bool,
+        additional_param: Box<T>,
+    ) -> DH {
+        self(virtual_file, keep_file_structure, additional_param)
+    }
+}
+
+pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
     client: &mut QueryClient,
     req: DownloadFilesRequest,
     // Hook function to provide which file to write to.
-    file_choser_hook: Box<
-        dyn Fn(VirtualFileDetails, String) -> Box<dyn BucketFileDownloadHandler<Error = DownloadFilesFromBucketError, DecryptionModule = DecryptionModule>>,
-    >,
+    create_file_download_handler_hook: impl CreateFileDownloadHandler<DH, T>,
     jwt_token: String,
+    keep_file_structure: bool,
+    additional_param: Box<T>,
 ) -> Result<(), DownloadFilesFromBucketError>
 //where
     //Error: std::error::Error + Debug + Send + Sync + 'static,
@@ -212,12 +235,15 @@ pub async fn download_files_from_bucket<DecryptionModule>(
                         size_in_bytes: file.file_size_in_bytes,
                     };
 
-                    let mut download_handler =
-                        file_choser_hook(virtual_detail, file.download_url.clone());
+                    let mut download_handler = create_file_download_handler_hook.handle(
+                        virtual_detail,
+                        keep_file_structure,
+                        additional_param,
+                    );
                     let url = url::Url::parse(file.download_url.as_str()).unwrap();
                     let mut size_left_in_bytes = file.file_size_in_bytes;
                     while size_left_in_bytes > 0 {
-                        donwload_from_url(
+                        donwload_from_url::<DH>(
                             &url,
                             &mut size_left_in_bytes,
                             &mut download_handler,
@@ -225,9 +251,11 @@ pub async fn download_files_from_bucket<DecryptionModule>(
                         )
                         .await?;
                     }
-                    download_handler
-                        .on_download_finish()
-                        .map_err(|err| DownloadFilesFromBucketError::from(err))?;
+                    download_handler.on_download_finish().map_err(
+                        |err| -> DownloadFilesFromBucketError {
+                            DownloadFilesFromBucketError::DownloadFinishError(Box::new(err))
+                        },
+                    )?;
                 }
             }
             Err(e) => {
@@ -237,12 +265,15 @@ pub async fn download_files_from_bucket<DecryptionModule>(
     }
     Ok(())
 }
+
 // TODO: Move to params to DTO
-pub async fn bucket_download(
+pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
     client: &mut QueryClient,
     req: DownloadBucketRequest,
-    _keep_file_structure: bool, // Will keep the same file structure as on the server. This means directory/directory containing the file
-    download_handler: &mut BucketFileWriter,
+    keep_file_structure: bool, // Will keep the same file structure as on the server. This means directory/directory containing the file
+    //download_handler: &mut BucketFileWriter,
+    create_download_handler: impl CreateFileDownloadHandler<DH, T>,
+    additional_param: Box<T>,
 ) -> Result<Vec<String>, DownloadError> {
     let resp = client.download_bucket(req).await.unwrap();
     let mut res = resp.into_inner();
@@ -251,7 +282,13 @@ pub async fn bucket_download(
         let url = url::Url::parse(file.download_url.as_str()).unwrap();
         let http_resp = Request::get(url.as_str()).send().await?;
         let resp_bin = http_resp.binary().await?;
-
+        let virtual_file = VirtualFileDetails {
+            path: file.file_path,
+            date: None,
+            size_in_bytes: file.file_size_in_bytes,
+        };
+        let download_handler =
+            create_download_handler.handle(virtual_file, keep_file_structure, additional_param);
         // let download_urls = file.download_urls.clone();
         // for download_url in download_urls {
         //     let url = url::Url::parse(download_url.as_str()).unwrap();
@@ -262,7 +299,10 @@ pub async fn bucket_download(
         //         .await?; //TODO: Fix
         //     let resp_bin = http_resp.binary().await?; // TODO: Test? might need body instead. IDK
         //
-        download_handler.on_download_chunk(&resp_bin).await?;
+        download_handler
+            .on_download_chunk(&resp_bin)
+            .await
+            .map_err(DownloadFilesFromBucketError)?;
     }
     Ok(Vec::new())
 }
@@ -296,15 +336,12 @@ pub enum DownloadFromUrlError {
     #[error("Empty body")]
     EmptyBody,
 }
-pub async fn donwload_from_url<Error, DecryptionModule>(
+pub async fn donwload_from_url<DH: BucketFileDownloadHandler>(
     url: &url::Url,
     size_left_in_bytes: &mut u64,
-    download_handler: &mut Box<dyn BucketFileDownloadHandler<Error = Error, DecryptionModule = DecryptionModule>>,
+    download_handler: &mut DH,
     jwt_token: &str,
-) -> Result<u16, DownloadFromUrlError>
-where
-    Error: std::fmt::Debug,
-{
+) -> Result<u16, DownloadFromUrlError> {
     //https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateMultipartUpload.html
     let resp = Request::get(url.as_str())
         .header("Authorization", jwt_token)
