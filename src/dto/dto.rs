@@ -1,15 +1,14 @@
-use std::convert::Infallible;
-
 use bucket_common_types::{
     unix_timestamp::UnixTimestamp, BucketCompression, BucketEncryption, BucketGuid,
     BucketRedundancy, BucketRegion, BucketStorageClass, BucketVisibility, PaymentModel,
     RegionCluster,
 };
-use time::OffsetDateTime;
 
 use crate::{
     controller::bucket::{
-        bucket::DownloadFilesFromBucketError, errors::{DownloadError, UploadError}, io::file::VirtualBucketFile,
+        bucket::DownloadFilesFromBucketError,
+        errors::{DownloadError, UploadError},
+        io::file::VirtualFileDetails,
     },
     query_client::backend_api::{
         download_files_request::File, get_account_details_request::User, CreateBucketRequest,
@@ -30,10 +29,10 @@ pub struct CreateBucketParams {
     encryption: Option<BucketEncryption>,
     password: Option<String>,
     target_directory: String,
-    source_files: Vec<VirtualBucketFile>,
+    source_files: Vec<VirtualFileDetails>,
     description: Option<String>,
     storage_class: BucketStorageClass,
-    expire_at: Option<OffsetDateTime>,
+    expire_at: Option<bucket_common_types::unix_timestamp::UnixTimestamp>,
     expected_capacity: Option<u64>,
     is_nsfw: bool,
     is_searchable: bool,
@@ -67,7 +66,7 @@ impl TryInto<CreateBucketRequest> for CreateBucketParams {
             storage_class: self.storage_class.to_string(),
             tags: self.tags,
             expires_timestamp: match self.expire_at {
-                Some(x) => x.try_into().unwrap(),
+                Some(x) => Some(x.try_into().unwrap()),
                 None => None,
             },
             expected_capacity_in_bytes: self.expected_capacity,
@@ -114,7 +113,7 @@ pub struct UpdateBucketParams {
     description: Option<String>,
     stroage_class: Option<BucketStorageClass>,
     opt_tags: Vec<String>,
-    expires_timestamp: Option<OffsetDateTime>,
+    expires_timestamp: Option<bucket_common_types::unix_timestamp::UnixTimestamp>,
     expected_size_in_bytes: Option<u64>,
     bucket_compression: Option<BucketCompression>,
     is_nsfw: Option<bool>,
@@ -143,9 +142,9 @@ impl TryInto<UpdateBucketRequest> for UpdateBucketParams {
             },
             password: self.password,
             pre_allocated_capacity_in_bytes: todo!(),
-            redundancy: self.redundancy,
+            redundancy: None,
             region_cluster: match self.region_cluster {
-                Some(x) => Some(x.try_into()?),
+                Some(x) => Some(x.to_string()),
                 None => None,
             },
             description: self.description,
@@ -155,7 +154,7 @@ impl TryInto<UpdateBucketRequest> for UpdateBucketParams {
             },
             opt_tags: self.opt_tags,
             expires_timestamp: match self.expires_timestamp {
-                Some(x) => Some(x.try_into()?),
+                Some(x) => Some(x.try_into().unwrap()),
                 None => None,
             },
             expected_size_in_bytes: self.expected_size_in_bytes,
@@ -205,7 +204,7 @@ impl TryInto<GetBucketDetailsRequest> for GetBucketDetailsParams {
 
 pub struct UploadFile {
     pub target_directory: String,
-    pub source_file: VirtualBucketFile,
+    pub source_file: VirtualFileDetails,
 }
 
 pub struct UploadFilesParams {
@@ -247,7 +246,7 @@ pub struct DownloadFilesParams {
     pub target_bucket_id: uuid::Uuid,
     pub target_user_id: uuid::Uuid,
     pub target_directory: String,
-    pub files: Vec<VirtualBucketFile>,
+    pub files: Vec<VirtualFileDetails>,
     pub hashed_password: Option<String>,
     pub bucket_encryption: Option<BucketEncryption>,
 }
@@ -276,9 +275,6 @@ impl TryInto<DownloadFilesRequest> for DownloadFilesParams {
         })
     }
 }
-
-
-
 
 pub struct DownloadBucketParams {
     pub bucket_guid: BucketGuid,
@@ -471,7 +467,7 @@ impl TryInto<CreateBucketShareLinkRequest> for CreateBucketShareLinkParams {
             user_id: self.target_bucket_guid.user_id.to_string(),
             bucket_id: self.target_bucket_guid.bucket_id.to_string(),
             expires: match self.expires {
-                Some(x) => x.try_into()?,
+                Some(x) => Some(x.try_into().unwrap()),
                 None => None,
             },
             usages: self.usages,

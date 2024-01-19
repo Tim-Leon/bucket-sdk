@@ -1,11 +1,9 @@
 use crate::controller::bucket::bucket::{
     bucket_download, download_files_from_bucket, download_from_url, upload_to_url,
+    CreateFileDownloadHandler,
 };
-use crate::controller::bucket::download_handler::{BucketFileDownloadHandler, BucketFileWriter};
-use crate::controller::bucket::errors::BucketDownloadHandlerErrors;
-use crate::controller::bucket::io::file::{
-    BucketFileTrait, VirtualBucketFile, VirtualFileDetails, VirtualWebBucketFile,
-};
+use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
+
 use crate::encryption_v1::module::EncryptionModule;
 use crate::query_client::backend_api::{UpdateBucketRequest, UpdateBucketResponse};
 use crate::query_client::QueryClient;
@@ -108,42 +106,49 @@ impl BucketApi {
     // }
 
     ///https://repost.aws/questions/QUxynkZDbASDaqrUcpx_sILQ/s3-support-multiple-byte-ranges-download
-    pub async fn download_files_from_bucket<DecryptionModule>(
+    pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
         &mut self,
         _param: DownloadFilesParams,
         //file_handle: BucketFileTrait<Error = BucketFileError, FileHandle = FileHandle>,
         // Hook function will take in the details for the file and either return a WebBucketFile or NativeBucketFile depending on enviorment implementation, diffrent between WASM and NATIVE.
-        file_choser_hook: Box<
-            dyn Fn(
-                VirtualFileDetails,
-                String,
-            )
-                -> Box<dyn BucketFileDownloadHandler<Error = BucketDownloadHandlerErrors, DecryptionModule = DecryptionModule>>,
-        >,
+        create_file_download_handler: impl CreateFileDownloadHandler<DH, T>,
         //file_choser: T where T impl (VirtualFileDetails, String) -> VirtualBucketFile,
         jwt_token: String,
+        keep_file_structure: bool,
+        additional_param: Box<T>,
     ) -> Result<(), BucketApiError> {
         let req: DownloadFilesRequest = _param.try_into()?;
-        download_files_from_bucket(&mut self.client, req, file_choser_hook, jwt_token).await?;
+        download_files_from_bucket::<DH, T>(
+            &mut self.client,
+            req,
+            create_file_download_handler,
+            jwt_token,
+            keep_file_structure,
+            additional_param,
+        )
+        .await?;
         Ok(())
     }
 
-
-    
-    pub async fn bucket_download<DH: BucketFileDownloadHandler>(
+    pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
         &mut self,
         param: DownloadBucketParams,
-        create_file_download_handler: Box<dyn Fn(VirtualBucketFile) -> DH>,
+        create_file_download_handler: impl CreateFileDownloadHandler<DH, T>,
+        additional_param: Box<T>,
     ) -> Result<Vec<String>, BucketApiError> {
+        let keep_file_structure = param.keep_file_structure;
         let req = param.try_into()?;
-        let mut download_handler = create_file_download_handler();
-        let res = bucket_download(
+
+        let res = bucket_download::<DH, T>(
             &mut self.client,
             req,
-            param.keep_file_structure,
-            &mut download_handler,
+            keep_file_structure,
+            //&mut download_handler,
+            create_file_download_handler,
+            additional_param,
         )
         .await?;
+
         Ok(res)
     }
 
