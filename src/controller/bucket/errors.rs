@@ -3,8 +3,6 @@ use mime::FromStrError;
 use std::convert::Infallible;
 use std::sync::PoisonError;
 
-
-
 #[derive(Debug, thiserror::Error)]
 pub enum BucketDownloadHandlerFileErrors {
     #[error("Encryption module not initialized when bucket is encrypted.")]
@@ -24,7 +22,6 @@ pub enum BucketDownloadHandlerErrors {
     #[error(transparent)]
     DecryptionError(#[from] DecryptionError),
 }
-
 
 #[derive(Debug, thiserror::Error)]
 pub enum DownloadError {

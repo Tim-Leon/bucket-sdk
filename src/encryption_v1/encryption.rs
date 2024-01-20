@@ -8,7 +8,7 @@ use std::sync::Arc;
 //use sha2::Sha512;
 use crate::encryption_v1::constants::V1_ENCRYPTION_PASSWORD_SALT;
 use crate::encryption_v1::hash::{
-    argon2id_hash_password, bucket_key_hash_sha512, PasswordHashErrors, PasswordStrengthError,
+    argon2id_hash_password, bucket_key_hash_sha256, PasswordHashErrors, PasswordStrengthError,
 };
 
 use highway::HighwayHash;
@@ -68,15 +68,19 @@ pub enum EncryptionSetupError {
     PasswordHashError(#[from] PasswordHashErrors),
     #[error("Encryption setup error")]
     PasswordStrengthError(#[from] PasswordStrengthError),
+
 }
 
 /*
 * Entry point for encryption module.
 * This function is called after the user has logged in.
+* TODO: Fuzz input
+* MUST BE DETERMINISTIC
 */
 pub fn setup(password: &str, email: &str) -> Result<ClientSecrets, EncryptionSetupError> {
     let master_key = argon2id_hash_password(password, email, V1_ENCRYPTION_PASSWORD_SALT)?;
-    let ed25519_keypair = ed25519_compact::KeyPair::from_slice(master_key.as_bytes()).unwrap();
+    let seed = ed25519_compact::Seed::from_slice(master_key[0..32].as_bytes()).unwrap();
+    let ed25519_keypair = ed25519_compact::KeyPair::from_seed(seed); //from_slice(master_key.as_bytes().take).unwrap();
     Ok(ClientSecrets {
         master_key,
         ed25519_keypair,
@@ -87,7 +91,7 @@ pub fn generate_bucket_encryption_key(
     secrets: Arc<ClientSecrets>,
     bucket_id: &uuid::Uuid,
 ) -> Result<aes_gcm::Aes256Gcm, InvalidLength> {
-    let bucket_key = bucket_key_hash_sha512(secrets.master_key.clone(), bucket_id);
+    let bucket_key = bucket_key_hash_sha256(secrets.master_key.clone(), bucket_id);
     //let aes_gcm_key = aes_gcm::Key::<aes_gcm::Aes256Gcm>::from_slice(bucket_key.as_slice());
     let aes_gcm_key = aes_gcm::Aes256Gcm::new_from_slice(bucket_key.as_slice());
     aes_gcm_key
@@ -179,7 +183,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_setup() -> Result<(), ()> {
-        let _secrets = setup("password", "email");
+        let _secrets = setup("sajMSudosajSADao839d(#", "email");
         //encrypted_upload_files();
         Ok(())
     }

@@ -1,7 +1,6 @@
 use bucket_common_types::{
     unix_timestamp::UnixTimestamp, BucketCompression, BucketEncryption, BucketGuid,
-    BucketRedundancy, BucketStorageClass, BucketVisibility, PaymentModel,
-    RegionCluster,
+    BucketRedundancy, BucketStorageClass, BucketVisibility, PaymentModel, RegionCluster,
 };
 
 use crate::{
@@ -15,9 +14,8 @@ use crate::{
         CreateBucketShareLinkRequest, CreateCheckoutRequest, DeleteAccountRequest,
         DeleteBucketRequest, DeleteFilesInBucketRequest, DownloadBucketRequest,
         DownloadFilesRequest, GetAccountDetailsRequest, GetBucketDetailsFilter,
-        GetBucketDetailsRequest, GetBucketFilestructureRequest,
-        MoveFilesInBucketRequest, UpdateAccountRequest, UpdateBucketRequest,
-        UploadFilesToBucketRequest,
+        GetBucketDetailsRequest, GetBucketFilestructureRequest, MoveFilesInBucketRequest,
+        UpdateAccountRequest, UpdateBucketRequest, UploadFilesToBucketRequest,
     },
 };
 

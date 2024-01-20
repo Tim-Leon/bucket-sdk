@@ -17,7 +17,6 @@ use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
 use crate::controller::bucket::download_handler::BucketFileWriter;
 use crate::query_client::backend_api::DownloadFilesRequest;
 
-
 use crate::query_client::{
     backend_api::{
         self, DeleteFilesInBucketRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest,
@@ -287,8 +286,11 @@ pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
             date: None,
             size_in_bytes: file.file_size_in_bytes,
         };
-        let mut download_handler =
-            create_download_handler.handle(virtual_file, keep_file_structure, additional_param.clone());
+        let mut download_handler = create_download_handler.handle(
+            virtual_file,
+            keep_file_structure,
+            additional_param.clone(),
+        );
         // let download_urls = file.download_urls.clone();
         // for download_url in download_urls {
         //     let url = url::Url::parse(download_url.as_str()).unwrap();
@@ -299,11 +301,8 @@ pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
         //         .await?; //TODO: Fix
         //     let resp_bin = http_resp.binary().await?; // TODO: Test? might need body instead. IDK
         //
-        download_handler
-            .on_download_chunk(&resp_bin)
-            .await.unwrap();
-            //.map_err(|err| -> DownloadError {DownloadError::from(err)})?;
-
+        download_handler.on_download_chunk(&resp_bin).await.unwrap();
+        //.map_err(|err| -> DownloadError {DownloadError::from(err)})?;
     }
     Ok(Vec::new())
 }

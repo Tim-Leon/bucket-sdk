@@ -1,7 +1,6 @@
 use infer::Type;
 use mime::Mime;
 
-
 use std::os::unix::prelude::FileExt;
 
 use std::str::FromStr;

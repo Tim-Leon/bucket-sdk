@@ -153,14 +153,14 @@ mod tests {
     use super::*;
     #[test]
     fn test_encryption_module() -> Result<(), ()> {
-        let secrets = Arc::from(setup("password", "email").unwrap());
+        let secrets = Arc::from(setup("jkl!9OSda_jdsAdjoi9839", "email@email.com").unwrap());
         let bucket_id = uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
         let mut enc = ZeroKnowledgeEncryptionModuleV1::new(secrets.clone(), &bucket_id.clone());
         let data = "asjdipasjdaosdjapsdjeaomclcmsiufriunkdvnfdkvdnveruio90903r0jwifojef9qjpquogqhh83uqh8uieaaapöshuidxjnm,zxcbiarv";
         let _enc_data = enc.update(data).unwrap();
         let signature = Signature::from_slice(enc.finalize().unwrap().as_slice()).unwrap();
         let _dec = ZeroKnowledgeDecryptionModuleV1::new(secrets, &bucket_id, Some(signature));
-
+        //_dec.update(_enc_data);
         //encrypted_upload_files();
         Ok(())
     }

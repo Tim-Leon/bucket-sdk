@@ -1,9 +1,7 @@
 use crate::controller::bucket::bucket::{
-    bucket_download, download_files_from_bucket,
-    CreateFileDownloadHandler,
+    bucket_download, download_files_from_bucket, CreateFileDownloadHandler,
 };
 use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
-
 
 use crate::query_client::backend_api::{UpdateBucketRequest, UpdateBucketResponse};
 use crate::query_client::QueryClient;
@@ -13,10 +11,11 @@ use crate::{
         CreateBucketRequest, CreateBucketResponse, CreateBucketShareLinkRequest,
         CreateBucketShareLinkResponse, CreateCheckoutRequest, CreateCheckoutResponse,
         DeleteAccountRequest, DeleteAccountResponse, DeleteBucketRequest,
-        DeleteFilesInBucketRequest, DeleteFilesInBucketResponse, DownloadFilesRequest, GetAccountDetailsRequest, GetAccountDetailsResponse,
-        GetBucketDetailsRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest,
-        GetBucketFilestructureResponse, MoveFilesInBucketRequest, MoveFilesInBucketResponse,
-        UpdateAccountRequest, UpdateAccountResponse,
+        DeleteFilesInBucketRequest, DeleteFilesInBucketResponse, DownloadFilesRequest,
+        GetAccountDetailsRequest, GetAccountDetailsResponse, GetBucketDetailsRequest,
+        GetBucketDetailsResponse, GetBucketFilestructureRequest, GetBucketFilestructureResponse,
+        MoveFilesInBucketRequest, MoveFilesInBucketResponse, UpdateAccountRequest,
+        UpdateAccountResponse,
     },
 };
 use std::rc::Rc;
