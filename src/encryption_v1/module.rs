@@ -147,6 +147,7 @@ impl DecryptionModule for ZeroKnowledgeDecryptionModuleV1 {
 
 #[cfg(test)]
 mod tests {
+
     use crate::encryption_v1::encryption::setup;
 
     // Note this useful idiom: importing names from outer (for mod tests) scope.
@@ -159,9 +160,9 @@ mod tests {
         let data = "asjdipasjdaosdjapsdjeaomclcmsiufriunkdvnfdkvdnveruio90903r0jwifojef9qjpquogqhh83uqh8uieaaapöshuidxjnm,zxcbiarv";
         let _enc_data = enc.update(data).unwrap();
         let signature = Signature::from_slice(enc.finalize().unwrap().as_slice()).unwrap();
-        let _dec = ZeroKnowledgeDecryptionModuleV1::new(secrets, &bucket_id, Some(signature));
-        //_dec.update(_enc_data);
-        //encrypted_upload_files();
+        let mut _dec = ZeroKnowledgeDecryptionModuleV1::new(secrets, &bucket_id, Some(signature));
+        let data2 = _dec.update(_enc_data).unwrap();
+        assert_eq!(data, std::str::from_utf8(data2.as_slice()).unwrap());
         Ok(())
     }
 }
