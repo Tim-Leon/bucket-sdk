@@ -40,11 +40,11 @@ impl ZeroKnowledgeEncryptionModuleV1 {
             secrets: secrets.clone(),
             bucket_symmetric_encryption_key: generate_bucket_encryption_key(
                 secrets.clone(),
-                &bucket_id,
+                bucket_id,
             )
             .unwrap(),
             hasher: highway::HighwayHasher::new(highway::Key(HIGHWAY_HASH_KEY)),
-            nonce: Nonce::from_slice(&AES_GCM_NONCE).clone(), //TODO: NONCE should come from the bucket name?
+            nonce: *Nonce::from_slice(&AES_GCM_NONCE), //TODO: NONCE should come from the bucket name?
             ed25519_noise: Noise::from_slice(&SHARE_LINK_SIGNATURE_NOISE).unwrap(),
         }
     }
@@ -56,7 +56,7 @@ impl EncryptionModule for ZeroKnowledgeEncryptionModuleV1 {
         let ciphertext = self
             .bucket_symmetric_encryption_key
             .encrypt(&self.nonce, plaintext.as_ref())
-            .map_err(|err| EncryptionError::FailedToEncryptChunk(err))?;
+            .map_err(EncryptionError::FailedToEncryptChunk)?;
         self.hasher.append(&ciphertext);
         Ok(ciphertext)
     }
@@ -99,11 +99,11 @@ impl ZeroKnowledgeDecryptionModuleV1 {
             secrets: secrets.clone(),
             bucket_symmetric_encryption_key: generate_bucket_encryption_key(
                 secrets.clone(),
-                &bucket_id,
+                bucket_id,
             )
             .unwrap(),
             hasher: highway::HighwayHasher::new(highway::Key(HIGHWAY_HASH_KEY)),
-            nonce: Nonce::from_slice(&AES_GCM_NONCE).clone(), //TODO: NONCE should come from the bucket name?
+            nonce: *Nonce::from_slice(&AES_GCM_NONCE), //TODO: NONCE should come from the bucket name?
             ed25519_noise: Noise::from_slice(&SHARE_LINK_SIGNATURE_NOISE).unwrap(),
             signature,
         }
@@ -125,7 +125,7 @@ impl DecryptionModule for ZeroKnowledgeDecryptionModuleV1 {
         let plaintext = self
             .bucket_symmetric_encryption_key
             .decrypt(&self.nonce, ciphertext.as_ref())
-            .map_err(|err| DecryptionError::FailedToDecryptChunk(err))?;
+            .map_err(DecryptionError::FailedToDecryptChunk)?;
         Ok(plaintext)
     }
 
@@ -138,7 +138,7 @@ impl DecryptionModule for ZeroKnowledgeDecryptionModuleV1 {
                     .ed25519_keypair
                     .pk
                     .verify(bytemuck::bytes_of(&hash_result), &signature)
-                    .map_err(|err| DecryptionError::InvalidSignature(err))?;
+                    .map_err(DecryptionError::InvalidSignature)?;
             }
         }
         Ok(())

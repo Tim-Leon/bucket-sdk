@@ -34,12 +34,12 @@ pub fn argon2id_hash_password(
     // the max length for salt is 64 bytes so it should work out fine.
     // Hash the password with argon2id and the salt which is sha512(email).
     //let salt = Salt::from_b64(&str::from_utf8(email_hash.as_slice()));
-    let salt = SaltString::from_b64(&std::str::from_utf8(email_hash.as_slice())?)
-        .map_err(|err| PasswordHashErrors::PasswordHashError(err))?;
+    let salt = SaltString::from_b64(std::str::from_utf8(email_hash.as_slice())?)
+        .map_err(PasswordHashErrors::PasswordHashError)?;
     let argon2id = Argon2::default();
     let password_hash = argon2id
         .hash_password(password.as_bytes(), salt.as_salt())
-        .map_err(|err| PasswordHashErrors::PasswordHashError(err))?;
+        .map_err(PasswordHashErrors::PasswordHashError)?;
     Ok(password_hash.to_string())
 }
 
@@ -87,6 +87,6 @@ pub fn bucket_key_hash_sha512(
     let mut hasher = Sha3_512::new();
     hasher.update(bucket_id.as_bytes());
     hasher.update(password_hash.to_string().as_bytes());
-    let result = hasher.finalize();
-    result
+    
+    hasher.finalize()
 }

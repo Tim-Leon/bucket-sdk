@@ -56,8 +56,8 @@ pub async fn login(
     let oprf_finish = oprf_start
         .state
         .finish(
-            &password.as_bytes(),
-            CredentialResponse::deserialize(&start_resp.oprf.as_slice())?,
+            password.as_bytes(),
+            CredentialResponse::deserialize(start_resp.oprf.as_slice())?,
             ClientLoginFinishParameters::default(),
         )
         .unwrap();
@@ -65,14 +65,14 @@ pub async fn login(
     let finish_req = AccountLoginFinishRequest {
         oprf: oprf_finish.message.serialize().to_vec(),
         session_id: start_resp.session_id,
-        totp_code: totp_code,
+        totp_code,
     };
 
     let finish_resp = query_client
         .account_login_finish(finish_req)
         .await?
         .into_inner();
-    return Ok(finish_resp.jwt_token as JwtToken);
+    Ok(finish_resp.jwt_token as JwtToken)
 }
 
 pub async fn register(
@@ -92,9 +92,9 @@ pub async fn register(
             .unwrap();
 
     let start_req = CreateAccountStartRequest {
-        email: email,
+        email,
         oprf: oprf_start.message.serialize().to_vec(),
-        captcha: captcha,
+        captcha,
     };
     let start_resp = query_client
         .create_account_start(start_req)
@@ -103,14 +103,14 @@ pub async fn register(
 
     let oprf_finish = oprf_start.state.finish(
         &mut rng,
-        &password.as_bytes(),
-        RegistrationResponse::deserialize(&start_resp.oprf.as_slice())?,
+        password.as_bytes(),
+        RegistrationResponse::deserialize(start_resp.oprf.as_slice())?,
         ClientRegistrationFinishParameters::default(),
     )?;
 
     let finish_req = CreateAccountFinishRequest {
         oprf: oprf_finish.message.serialize().to_vec(),
-        username: username,
+        username,
         session_id: start_resp.session_id,
         public_signing_key: secrets.get_ed25519_public_signing_key().as_slice().to_vec(),
     };

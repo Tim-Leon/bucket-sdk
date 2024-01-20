@@ -3,12 +3,15 @@ WIll load the BUCKETDRIVE_ENDPOINT from .env file.
 Then run the following tests against it. This is used to both validate that this client is implemented correctly but also that the server response is correct.
 */
 
-use bucket_client_core::api::BucketApi;
-use bucket_client_core::{
-    api::CreateBucketParams, controller::account::authentication, query_client::QueryClient,
-};
+use bucket_sdk::api::BucketApi;
+use bucket_sdk::dto::dto::CreateBucketParams;
+use bucket_sdk::{controller::account::authentication, query_client::QueryClient};
 use common::setup;
 mod common;
+
+#[cfg(test)]
+mod tests {
+    use bucket_sdk::query_client::QueryClient;
 
 #[tokio::test]
 async fn check_signup() {
@@ -36,12 +39,24 @@ async fn check_create_bucket() {
     let apii = setup();
     apii.create_bucket(CreateBucketParams {
         target_user_id: todo!(),
-        target_bucket_id: todo!(),
+        name: todo!(),
+        visibility: todo!(),
+        encryption: todo!(),
+        password: todo!(),
         target_directory: todo!(),
         source_files: todo!(),
-        encryption: todo!(),
+        description: todo!(),
+        storage_class: todo!(),
+        expire_at: todo!(),
+        expected_capacity: todo!(),
+        is_nsfw: todo!(),
+        is_searchable: todo!(),
+        is_sharable: todo!(),
+        is_bucket_cloneable: todo!(),
+        is_prepaid: todo!(),
+        bucket_compression: todo!(),
+        tags: todo!(),
         total_size_in_bytes: todo!(),
-        hashed_password: todo!(),
     })
 }
 #[tokio::test]
@@ -63,3 +78,5 @@ async fn check_zero_knowledge_encryption() {}
 async fn check_compression() {}
 #[tokio::test]
 async fn check_share_bucket() {}
+
+}

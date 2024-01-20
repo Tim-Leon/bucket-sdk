@@ -13,8 +13,8 @@ pub enum BucketUploadHandlerErrors {}
 // A handler is create for each file download.
 #[async_trait(?Send)]
 pub trait BucketFileDownloadHandler {
-    type Error;
-    type DecryptionModule;
+    type Error: std::error::Error + Send + Sync + 'static;
+    type DecryptionModule: DecryptionModule;
 
     fn on_download_start(
         &mut self,
@@ -57,7 +57,7 @@ impl BucketFileDownloadHandler for BucketFileWriter {
         let blob = Blob::from(self.write_target_file.clone());
         //let bytes = read_as_bytes(&blob).await?;
         let mime: Mime = from_filename
-            .split(".")
+            .split('.')
             .last()
             .unwrap_or("application/octet-stream")
             .parse()?;

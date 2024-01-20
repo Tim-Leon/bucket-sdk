@@ -62,7 +62,7 @@ impl BucketFileUploadHandler for BucketFileReader {
         };
 
         let size = self.read_target_file.size();
-        Ok(size as u64)
+        Ok(size)
     }
 
     async fn on_upload_chunk(&mut self, chunk_size: u64) -> Result<Vec<u8>, Self::Error> {

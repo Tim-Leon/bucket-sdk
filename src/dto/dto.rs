@@ -1,6 +1,6 @@
 use bucket_common_types::{
     unix_timestamp::UnixTimestamp, BucketCompression, BucketEncryption, BucketGuid,
-    BucketRedundancy, BucketRegion, BucketStorageClass, BucketVisibility, PaymentModel,
+    BucketRedundancy, BucketStorageClass, BucketVisibility, PaymentModel,
     RegionCluster,
 };
 
@@ -15,7 +15,7 @@ use crate::{
         CreateBucketShareLinkRequest, CreateCheckoutRequest, DeleteAccountRequest,
         DeleteBucketRequest, DeleteFilesInBucketRequest, DownloadBucketRequest,
         DownloadFilesRequest, GetAccountDetailsRequest, GetBucketDetailsFilter,
-        GetBucketDetailsRequest, GetBucketFilestructureRequest, GetFileDetailsRequest,
+        GetBucketDetailsRequest, GetBucketFilestructureRequest,
         MoveFilesInBucketRequest, UpdateAccountRequest, UpdateBucketRequest,
         UploadFilesToBucketRequest,
     },
@@ -53,32 +53,20 @@ impl TryInto<CreateBucketRequest> for CreateBucketParams {
     fn try_into(self) -> Result<CreateBucketRequest, Self::Error> {
         Ok(CreateBucketRequest {
             name: self.name,
-            visibility: match self.visibility {
-                Some(x) => Some(x.to_string()),
-                None => None,
-            },
-            encryption: match self.encryption {
-                Some(x) => Some(x.to_string()),
-                None => None,
-            },
+            visibility: self.visibility.map(|x| x.to_string()),
+            encryption: self.encryption.map(|x| x.to_string()),
             password: self.password,
             description: self.description,
             storage_class: self.storage_class.to_string(),
             tags: self.tags,
-            expires_timestamp: match self.expire_at {
-                Some(x) => Some(x.try_into().unwrap()),
-                None => None,
-            },
+            expires_timestamp: self.expire_at.map(|x| x.try_into().unwrap()),
             expected_capacity_in_bytes: self.expected_capacity,
             is_nsfw: self.is_nsfw,
             is_searchable: self.is_searchable,
             is_bucket_cloneable: self.is_bucket_cloneable,
             is_sharable: self.is_sharable,
             is_prepaid: self.is_prepaid,
-            bucket_compression: match self.bucket_compression {
-                Some(x) => Some(x.to_string()),
-                None => None,
-            },
+            bucket_compression: self.bucket_compression.map(|x| x.to_string()),
         })
     }
 }
@@ -111,7 +99,7 @@ pub struct UpdateBucketParams {
     redundancy: Option<BucketRedundancy>,
     region_cluster: Option<RegionCluster>,
     description: Option<String>,
-    stroage_class: Option<BucketStorageClass>,
+    storage_class: Option<BucketStorageClass>,
     opt_tags: Vec<String>,
     expires_timestamp: Option<bucket_common_types::unix_timestamp::UnixTimestamp>,
     expected_size_in_bytes: Option<u64>,
@@ -132,40 +120,22 @@ impl TryInto<UpdateBucketRequest> for UpdateBucketParams {
             bucket_id: self.bucket_id.to_string(),
             bucket_user_id: self.bucket_user_id.to_string(),
             name: self.name,
-            visibility: match self.visibility {
-                Some(x) => Some(x.to_string()),
-                None => None,
-            },
-            encryption: match self.encryption {
-                Some(x) => Some(x.to_string()),
-                None => None,
-            },
+            visibility: self.visibility.map(|x| x.to_string()),
+            encryption: self.encryption.map(|x| x.to_string()),
             password: self.password,
-            pre_allocated_capacity_in_bytes: todo!(),
+            pre_allocated_capacity_in_bytes: None,
             redundancy: None,
-            region_cluster: match self.region_cluster {
-                Some(x) => Some(x.to_string()),
-                None => None,
-            },
+            region_cluster: self.region_cluster.map(|x| x.to_string()),
             description: self.description,
-            storage_class: match self.stroage_class {
-                Some(x) => Some(x.to_string()),
-                None => None,
-            },
+            storage_class: self.storage_class.map(|x| x.to_string()),
             opt_tags: self.opt_tags,
-            expires_timestamp: match self.expires_timestamp {
-                Some(x) => Some(x.try_into().unwrap()),
-                None => None,
-            },
+            expires_timestamp: self.expires_timestamp.map(|x| x.try_into().unwrap()),
             expected_size_in_bytes: self.expected_size_in_bytes,
             is_nsfw: self.is_nsfw,
             is_searchable: self.is_searchable,
             is_bucket_cloneable: self.is_bucket_cloneable,
             is_sharable: self.is_sharable,
-            bucket_compression: match self.bucket_compression {
-                Some(x) => Some(x.to_string()),
-                None => None,
-            },
+            bucket_compression: self.bucket_compression.map(|x| x.to_string()),
         })
     }
 }
@@ -230,7 +200,7 @@ impl TryInto<UploadFilesToBucketRequest> for UploadFilesParams {
             target_directory: self.target_directory,
             source_files: self.source_files.iter().fold(Vec::<crate::query_client::backend_api::upload_files_to_bucket_request::File>::with_capacity(self.source_files.len()), |mut acc, num| {
                 acc.push(crate::query_client::backend_api::upload_files_to_bucket_request::File {
-                    file_path: num.source_file.path,
+                    file_path: num.source_file.path.clone(),
                     size_in_bytes: num.source_file.size_in_bytes,
                 });
                 acc
@@ -265,7 +235,7 @@ impl TryInto<DownloadFilesRequest> for DownloadFilesParams {
                 Vec::<File>::with_capacity(self.files.len()),
                 |mut acc, val| {
                     acc.push(File {
-                        file_path: val.path,
+                        file_path: val.path.clone(),
                         size_in_bytes: val.size_in_bytes as u32,
                     }); //TODO: fix
                     acc
@@ -294,10 +264,7 @@ impl TryInto<DownloadBucketRequest> for DownloadBucketParams {
             bucket_id: self.bucket_guid.bucket_id.to_string(),
             bucket_owner_id: self.bucket_guid.user_id.to_string(),
             hashed_password: self.hashed_password,
-            format: match self.format {
-                Some(format) => Some(format.to_string()),
-                None => None,
-            },
+            format: self.format.map(|format| format.to_string()),
         })
     }
 }
@@ -322,10 +289,7 @@ impl TryInto<MoveFilesInBucketRequest> for MoveFilesInBucketParams {
             from_bucket_owner_id: self.from_bucket_guid.user_id.to_string(),
             from_filepaths: self.from_filepaths,
             to_bucket_id: self.to_bucket_id.to_string(),
-            to_bucket_owner_id: match self.to_bukcet_owner_id {
-                Some(x) => Some(x.to_string()),
-                None => None,
-            },
+            to_bucket_owner_id: self.to_bukcet_owner_id.map(|x| x.to_string()),
             to_directory: self.to_filepath,
             is_capacity_destructive: self.is_capacity_destructive,
         })
@@ -369,10 +333,7 @@ impl TryInto<GetBucketFilestructureRequest> for GetFilesystemDetailsParams {
     fn try_into(self) -> Result<GetBucketFilestructureRequest, Self::Error> {
         Ok(GetBucketFilestructureRequest {
             bucket_id: self.target_bucket_id.to_string(),
-            bucket_owner_id: match self.target_bucket_owner_id {
-                Some(x) => Some(x.to_string()),
-                None => None,
-            },
+            bucket_owner_id: self.target_bucket_owner_id.map(|x| x.to_string()),
             start_directory: self.start_directory,
             continuation_token: self.continuation_token,
         })
@@ -466,10 +427,7 @@ impl TryInto<CreateBucketShareLinkRequest> for CreateBucketShareLinkParams {
         Ok(CreateBucketShareLinkRequest {
             user_id: self.target_bucket_guid.user_id.to_string(),
             bucket_id: self.target_bucket_guid.bucket_id.to_string(),
-            expires: match self.expires {
-                Some(x) => Some(x.try_into().unwrap()),
-                None => None,
-            },
+            expires: self.expires.map(|x| x.try_into().unwrap()),
             usages: self.usages,
             registered_users_only: self.registered_users_only,
             view_permission: self.view_permission,

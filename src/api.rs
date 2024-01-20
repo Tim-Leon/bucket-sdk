@@ -1,30 +1,25 @@
 use crate::controller::bucket::bucket::{
-    bucket_download, download_files_from_bucket, download_from_url, upload_to_url,
+    bucket_download, download_files_from_bucket,
     CreateFileDownloadHandler,
 };
 use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
 
-use crate::encryption_v1::module::EncryptionModule;
+
 use crate::query_client::backend_api::{UpdateBucketRequest, UpdateBucketResponse};
 use crate::query_client::QueryClient;
 use crate::{
-    controller::bucket::{
-        bucket::upload_files_to_bucket,
-        upload_handler::{BucketFileReader, BucketFileUploadHandler},
-    },
     dto::dto::*,
     query_client::backend_api::{
         CreateBucketRequest, CreateBucketResponse, CreateBucketShareLinkRequest,
         CreateBucketShareLinkResponse, CreateCheckoutRequest, CreateCheckoutResponse,
         DeleteAccountRequest, DeleteAccountResponse, DeleteBucketRequest,
-        DeleteFilesInBucketRequest, DeleteFilesInBucketResponse, DownloadFilesRequest,
-        DownloadFilesResponse, GetAccountDetailsRequest, GetAccountDetailsResponse,
+        DeleteFilesInBucketRequest, DeleteFilesInBucketResponse, DownloadFilesRequest, GetAccountDetailsRequest, GetAccountDetailsResponse,
         GetBucketDetailsRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest,
         GetBucketFilestructureResponse, MoveFilesInBucketRequest, MoveFilesInBucketResponse,
-        UpdateAccountRequest, UpdateAccountResponse, UploadFilesToBucketRequest,
-        UploadFilesToBucketResponse,
+        UpdateAccountRequest, UpdateAccountResponse,
     },
 };
+use std::rc::Rc;
 use std::str::FromStr;
 
 pub struct ApiToken(String);
@@ -45,7 +40,7 @@ impl BucketApi {
     /// Uses enviorment variables:
     /// API_URL
     /// API_TOKEN
-    pub fn from_env(&self) -> Self {
+    pub fn from_env() -> Self {
         let api_url = url::Url::from_str(std::env::var("API_URL").unwrap().as_str()).unwrap();
         let api_token = std::env::var("API_TOKEN").unwrap();
         Self::new(&api_url, &api_token)
@@ -115,7 +110,7 @@ impl BucketApi {
         //file_choser: T where T impl (VirtualFileDetails, String) -> VirtualBucketFile,
         jwt_token: String,
         keep_file_structure: bool,
-        additional_param: Box<T>,
+        additional_param: Rc<T>,
     ) -> Result<(), BucketApiError> {
         let req: DownloadFilesRequest = _param.try_into()?;
         download_files_from_bucket::<DH, T>(
@@ -134,7 +129,7 @@ impl BucketApi {
         &mut self,
         param: DownloadBucketParams,
         create_file_download_handler: impl CreateFileDownloadHandler<DH, T>,
-        additional_param: Box<T>,
+        additional_param: Rc<T>,
     ) -> Result<Vec<String>, BucketApiError> {
         let keep_file_structure = param.keep_file_structure;
         let req = param.try_into()?;

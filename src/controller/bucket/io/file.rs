@@ -1,7 +1,7 @@
 use infer::Type;
 use mime::Mime;
 
-use std::ops::Deref;
+
 use std::os::unix::prelude::FileExt;
 
 use std::str::FromStr;
@@ -65,17 +65,14 @@ impl BucketFileTrait for VirtualWebBucketFile {
     }
     // Remember read is for uploading and write is for downloading. Kinda reversed if you think about it.
     fn is_readable(&self) -> bool {
-        return match self.file_handle {
-            None => false,
-            Some(_) => true,
-        };
+        self.file_handle.is_some()
     }
     fn get_file_handle(&self) -> &Option<Self::FileHandle> {
-        return &self.file_handle;
+        &self.file_handle
     }
 
     fn read_chunk(&self, size: u32, offset: u32) -> Result<Vec<u8>, Self::Error> {
-        return match &self.file_handle {
+        match &self.file_handle {
             Some(x) => {
                 let file = x.files().unwrap();
                 let _rs = file.get(0).unwrap().stream();
@@ -96,11 +93,11 @@ impl BucketFileTrait for VirtualWebBucketFile {
                 // Can not read from file that does not have a corresponding handle attached.
                 Err(WebBucketFileError::NoFileHandle)
             }
-        };
+        }
     }
 
     fn read_stream(&self) -> Result<ReadableStream, Self::Error> {
-        return match &self.file_handle {
+        match &self.file_handle {
             Some(x) => {
                 let file = x.files().unwrap();
                 let rs = file.get(0).unwrap().stream();
@@ -110,7 +107,7 @@ impl BucketFileTrait for VirtualWebBucketFile {
                 // Can not read from file that does not have a corresponding handle attached.
                 Err(WebBucketFileError::NoFileHandle)
             }
-        };
+        }
     }
 
     fn get_extension(&self) -> Result<String, Self::Error> {
@@ -131,17 +128,17 @@ impl BucketFileTrait for VirtualWebBucketFile {
     }
     //Checks the first couple of bytes of the file to get mime type.
     fn infer_mime_type(&self) -> Result<infer::Type, Self::Error> {
-        return match &self.file_handle {
+        match &self.file_handle {
             None => Err(WebBucketFileError::NoFileHandle),
             Some(_handle) => {
                 let buf = self.read_chunk(16, 0).unwrap();
                 let kind = infer::get(&buf);
-                return match kind {
+                match kind {
                     None => Err(WebBucketFileError::UnknownFileType),
                     Some(kind) => Ok(kind),
-                };
+                }
             }
-        };
+        }
     }
 
     fn write_chunk(&self) {}
@@ -174,25 +171,22 @@ impl BucketFileTrait for VirtualNativeBucketFile {
     }
 
     fn is_readable(&self) -> bool {
-        return match self.file_handle {
-            None => false,
-            Some(_) => true,
-        };
+        self.file_handle.is_some()
     }
 
     fn get_file_handle(&self) -> &Option<Self::FileHandle> {
-        return &self.file_handle;
+        &self.file_handle
     }
 
     fn read_chunk(&self, size: u32, offset: u32) -> Result<Vec<u8>, Self::Error> {
         let mut buffer = Vec::with_capacity(size as usize);
-        return match &self.file_handle {
-            None => return Err(NativeBucketFileError::NoFileToRead),
+        match &self.file_handle {
+            None => Err(NativeBucketFileError::NoFileToRead),
             Some(file) => {
                 file.read_at(buffer.as_mut_slice(), offset as u64)?;
                 Ok(buffer)
             }
-        };
+        }
     }
 
     fn read_stream(&self) -> Result<ReadableStream, Self::Error> {

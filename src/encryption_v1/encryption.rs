@@ -76,7 +76,7 @@ pub enum EncryptionSetupError {
 */
 pub fn setup(password: &str, email: &str) -> Result<ClientSecrets, EncryptionSetupError> {
     let master_key = argon2id_hash_password(password, email, V1_ENCRYPTION_PASSWORD_SALT)?;
-    let ed25519_keypair = ed25519_compact::KeyPair::from_slice(&master_key.as_bytes()).unwrap();
+    let ed25519_keypair = ed25519_compact::KeyPair::from_slice(master_key.as_bytes()).unwrap();
     Ok(ClientSecrets {
         master_key,
         ed25519_keypair,
@@ -101,7 +101,7 @@ pub struct ClientSecrets {
 
 impl ClientSecrets {
     pub fn get_ed25519_public_signing_key(&self) -> ed25519_compact::PublicKey {
-        return self.ed25519_keypair.pk;
+        self.ed25519_keypair.pk
     }
 }
 
@@ -120,7 +120,7 @@ pub async fn encrypted_upload_files(
     let key = highway::Key([1, 2, 3, 4]);
     let mut highway_hash = highway::HighwayHasher::new(key);
     let filename = file.name();
-    let aes_gcm_cipher = aes_gcm::Aes256Gcm::new_from_slice(&aes_gcm_symmetric_key).unwrap();
+    let aes_gcm_cipher = aes_gcm::Aes256Gcm::new_from_slice(aes_gcm_symmetric_key).unwrap();
     let nonce = aes_gcm::Nonce::from_slice(filename.as_bytes()); //TODO: Fix
                                                                  //let mut file_bytes = file.bytes();
                                                                  //file.read_to_end(&mut file_bytes);
@@ -135,7 +135,7 @@ pub async fn encrypted_upload_files(
     for _it in 0..&file_size / 1024 {
         let chunk_data = gloo::file::futures::read_as_bytes(&file).await.unwrap(); //TODO: What if file is too big for memory?
         let ciphertext = aes_gcm_cipher
-            .encrypt(&nonce, chunk_data.as_slice())
+            .encrypt(nonce, chunk_data.as_slice())
             .unwrap();
         highway_hash.append(&ciphertext);
         upload_fn(&ciphertext);

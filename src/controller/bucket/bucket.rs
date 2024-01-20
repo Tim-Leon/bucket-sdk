@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt::Debug;
+use std::rc::Rc;
 
 use bucket_common_types::exclusive_share_link::ExclusiveShareLink;
 use bucket_common_types::share_link::ShareLink;
@@ -16,7 +17,7 @@ use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
 use crate::controller::bucket::download_handler::BucketFileWriter;
 use crate::query_client::backend_api::DownloadFilesRequest;
 
-use crate::query_client::backend_api::GetBucketDetailsFilter;
+
 use crate::query_client::{
     backend_api::{
         self, DeleteFilesInBucketRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest,
@@ -109,14 +110,14 @@ pub async fn download_from_url<DH: BucketFileDownloadHandler + Clone, T>(
     format: Option<DownloadFormat>,
     //download_handler: DH,
     create_download_handler: impl CreateFileDownloadHandler<DH, T>,
-    additional_param: Box<T>,
+    additional_param: Rc<T>,
 ) -> Result<(), DownloadError> {
     let bucket_details = match url {
         //(user_id, bucket_id)
         ExclusiveShareLink::ShareLink(share) => {
             let detail = get_bucket_details_from_url(client, share)
                 .await
-                .map_err(|e| DownloadError::GetBucketDetailsFromUrlRequestFailed(e))?;
+                .map_err(DownloadError::GetBucketDetailsFromUrlRequestFailed)?;
             vec![detail.buckets.unwrap()]
         }
         ExclusiveShareLink::SecretShareLink(secret) => {
@@ -136,11 +137,11 @@ pub async fn download_from_url<DH: BucketFileDownloadHandler + Clone, T>(
             detail.buckets
         }
     };
-    if bucket_details.len() >= 1 {
+    if !bucket_details.is_empty() {
         return Err(DownloadError::BucketNotFound);
     }
 
-    let detail = bucket_details.get(0);
+    let detail = bucket_details.first();
     let detail = match detail {
         None => {
             return Err(DownloadError::BucketNotFound);
@@ -149,18 +150,15 @@ pub async fn download_from_url<DH: BucketFileDownloadHandler + Clone, T>(
     };
 
     let user_id = uuid::Uuid::try_parse(detail.owner_user_id.as_str())
-        .map_err(|e| DownloadError::ParseUserIdError(e))?;
+        .map_err(DownloadError::ParseUserIdError)?;
     let bucket_id = uuid::Uuid::try_parse(detail.bucket_id.as_str())
-        .map_err(|e| DownloadError::ParseBucketIdError(e))?;
+        .map_err(DownloadError::ParseBucketIdError)?;
 
     let bucket_download_req = DownloadBucketRequest {
         bucket_id: bucket_id.to_string(),
         bucket_owner_id: user_id.to_string(),
         hashed_password,
-        format: match format {
-            Some(x) => Some(x.to_string()),
-            None => None,
-        },
+        format: format.map(|x| x.to_string()),
     };
 
     bucket_download::<DH, T>(
@@ -178,6 +176,8 @@ pub async fn download_from_url<DH: BucketFileDownloadHandler + Clone, T>(
 pub enum DownloadFilesFromBucketError {
     #[error("on download finish error")]
     DownloadFinishError(Box<dyn Error + 'static>),
+    #[error(transparent)]
+    DownloadFromUrlError(#[from] DownloadFromUrlError),
 }
 
 impl From<BucketDownloadHandlerErrors> for DownloadFilesFromBucketError {
@@ -191,20 +191,20 @@ pub trait CreateFileDownloadHandler<DH: BucketFileDownloadHandler, T> {
         &self,
         virtual_file: super::io::file::VirtualFileDetails,
         keep_file_structure: bool,
-        additional_param: Box<T>,
+        additional_param: Rc<T>,
     ) -> DH;
 }
 
 // Example implementation of CreateFileDownloadHandler for a specific closure type
 impl<F, DH: BucketFileDownloadHandler, T> CreateFileDownloadHandler<DH, T> for F
 where
-    F: Fn(super::io::file::VirtualFileDetails, bool, Box<T>) -> DH,
+    F: Fn(super::io::file::VirtualFileDetails, bool, Rc<T>) -> DH,
 {
     fn handle(
         &self,
         virtual_file: super::io::file::VirtualFileDetails,
         keep_file_structure: bool,
-        additional_param: Box<T>,
+        additional_param: Rc<T>,
     ) -> DH {
         self(virtual_file, keep_file_structure, additional_param)
     }
@@ -217,7 +217,7 @@ pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
     create_file_download_handler_hook: impl CreateFileDownloadHandler<DH, T>,
     jwt_token: String,
     keep_file_structure: bool,
-    additional_param: Box<T>,
+    additional_param: Rc<T>,
 ) -> Result<(), DownloadFilesFromBucketError>
 //where
     //Error: std::error::Error + Debug + Send + Sync + 'static,
@@ -238,7 +238,7 @@ pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
                     let mut download_handler = create_file_download_handler_hook.handle(
                         virtual_detail,
                         keep_file_structure,
-                        additional_param,
+                        additional_param.clone(),
                     );
                     let url = url::Url::parse(file.download_url.as_str()).unwrap();
                     let mut size_left_in_bytes = file.file_size_in_bytes;
@@ -258,7 +258,7 @@ pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
                     )?;
                 }
             }
-            Err(e) => {
+            Err(_e) => {
                 todo!()
             }
         }
@@ -273,7 +273,7 @@ pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
     keep_file_structure: bool, // Will keep the same file structure as on the server. This means directory/directory containing the file
     //download_handler: &mut BucketFileWriter,
     create_download_handler: impl CreateFileDownloadHandler<DH, T>,
-    additional_param: Box<T>,
+    additional_param: Rc<T>,
 ) -> Result<Vec<String>, DownloadError> {
     let resp = client.download_bucket(req).await.unwrap();
     let mut res = resp.into_inner();
@@ -283,12 +283,12 @@ pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
         let http_resp = Request::get(url.as_str()).send().await?;
         let resp_bin = http_resp.binary().await?;
         let virtual_file = VirtualFileDetails {
-            path: file.file_path,
+            path: file.file_path.clone(),
             date: None,
             size_in_bytes: file.file_size_in_bytes,
         };
-        let download_handler =
-            create_download_handler.handle(virtual_file, keep_file_structure, additional_param);
+        let mut download_handler =
+            create_download_handler.handle(virtual_file, keep_file_structure, additional_param.clone());
         // let download_urls = file.download_urls.clone();
         // for download_url in download_urls {
         //     let url = url::Url::parse(download_url.as_str()).unwrap();
@@ -301,8 +301,9 @@ pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
         //
         download_handler
             .on_download_chunk(&resp_bin)
-            .await
-            .map_err(DownloadFilesFromBucketError)?;
+            .await.unwrap();
+            //.map_err(|err| -> DownloadError {DownloadError::from(err)})?;
+
     }
     Ok(Vec::new())
 }
@@ -320,7 +321,7 @@ pub async fn upload_to_url(
     let resp = Request::put(url.as_str())
         .header("Content-Type", "application/octet-stream")
         .body(Some(JsValue::from_str(std::str::from_utf8(
-            &file_chunk.as_slice(),
+            file_chunk.as_slice(),
         )?)))?
         .send()
         .await?;
@@ -400,16 +401,13 @@ async fn move_files_in_bucket(
         from_bucket_id: from_bucket_id.to_string(),
         from_bucket_owner_id: from_bucket_owner_id.to_string(),
         to_bucket_id: to_bucket_id.to_string(),
-        to_bucket_owner_id: match to_bucket_owner_id {
-            Some(id) => Some(id.to_string()),
-            None => None,
-        },
+        to_bucket_owner_id: to_bucket_owner_id.map(|id| id.to_string()),
         from_filepaths,
         to_directory,
         is_capacity_destructive: true,
     };
     let resp = client.move_files_in_bucket(req).await?.into_inner();
-    if resp.failed_file_paths.len() > 0 {
+    if !resp.failed_file_paths.is_empty() {
         return Err(MoveFilesInBucketError::FailedToMoveFileFilepath(
             FailedFilePaths(resp.failed_file_paths),
         ));
@@ -429,7 +427,7 @@ async fn delete_files_in_bucket(
 ) -> Result<(), DeleteFileInBucketError> {
     let resp = client.delete_files_in_bucket(req).await?.into_inner();
     let failed_filepaths = resp.failed_file_paths;
-    if failed_filepaths.len() > 0 {
+    if !failed_filepaths.is_empty() {
         return Err(DeleteFileInBucketError::FailedToDeleteFilepath(
             failed_filepaths,
         ));
