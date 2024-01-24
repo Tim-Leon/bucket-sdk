@@ -3,29 +3,36 @@ WIll load the BUCKETDRIVE_ENDPOINT from .env file.
 Then run the following tests against it. This is used to both validate that this client is implemented correctly but also that the server response is correct.
 */
 
-use bucket_sdk::api::BucketApi;
-use bucket_sdk::dto::dto::CreateBucketParams;
-use bucket_sdk::{controller::account::authentication, query_client::QueryClient};
-use common::setup;
+// https://docs.hcaptcha.com/#integration-testing-test-keys
+struct hcaptcha_test_key_set {
+    pub site_key: String,
+    pub secret_key: String,
+    pub response_token: String,
+}
+
+impl Default for hcaptcha_test_key_set {
+    fn default() -> Self {
+        Self {
+            site_key: "10000000-ffff-ffff-ffff-000000000001".to_string(),
+            secret_key: "0x0000000000000000000000000000000000000000".to_string(),
+            response_token: "10000000-aaaa-bbbb-cccc-000000000001".to_string(),
+        }
+    }
+}
+
 mod common;
 
 #[cfg(test)]
 mod tests {
-    use bucket_common_types::BucketGuid;
-    use bucket_sdk::{
-        controller::account::authentication,
-        dto::dto::{CreateBucketParams, DeleteBucketParams},
-        query_client::QueryClient,
-    };
 
-    use crate::common::setup;
+    use bucket_sdk::{controller::account::authentication, query_client::QueryClient};
 
     #[tokio::test]
     async fn check_signup() {
         let mut query_client = QueryClient::build_from_env();
-        let email = "".to_string();
-        let username = "".to_string();
-        let password = "".to_string();
+        let email = "email@domain.com".to_string();
+        let username = "awesomeusername".to_string();
+        let password = "awesomepassword".to_string();
         let captcha = "".to_string();
         authentication::register(&mut query_client, email, username, password, captcha)
             .await

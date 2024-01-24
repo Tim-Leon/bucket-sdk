@@ -68,7 +68,6 @@ pub enum EncryptionSetupError {
     PasswordHashError(#[from] PasswordHashErrors),
     #[error("Encryption setup error")]
     PasswordStrengthError(#[from] PasswordStrengthError),
-
 }
 
 /*

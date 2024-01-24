@@ -9,19 +9,22 @@ s3 = []
 proto = []
 wasm = []
 web = ["wasm", "proto"]
-cli = ["proto", "s3"]
-
+cli = ["proto", "s3", "native"]
+native = ["dep:tokio", "dep:tokio-stream"]
 [dependencies]
-bucket-common-types = { git = "https://github.com/Tim-Leon/bucket-common-types.git", features = ["secret_share_link", "share_link"] }
+bucket-common-types = { git = "https://github.com/Tim-Leon/bucket-common-types.git", features = [
+    "secret_share_link",
+    "share_link",
+] }
 zxcvbn = "2.2.2"
-uuid = {version = "1.4.0", features = ["v4", "fast-rng"]}
+uuid = { version = "1.4.0", features = ["v4", "fast-rng"] }
 url = "2.4.0"
 thiserror = "*"
 bitflags = "2.3.3"
 sha3 = "0.10.8"
 argon2 = "0.5.0"
 highway = "1.1.0"
-opaque-ke = {version="3.0.0-pre.3", features = ["argon2"]}
+opaque-ke = { version = "3.0.0-pre.3", features = ["argon2"] }
 ed25519-compact = { version = "2.0.4" }
 x25519-dalek = "2.0.0"
 aes-gcm = "0.10.2"
@@ -37,7 +40,7 @@ anyhow = "*"
 base64 = "0.21.2"
 serde = "1.0.175"
 bytemuck = "1.13.1"
-gloo = {version= "0.10.0", features = ["futures", "net", "file", "worker"]}
+gloo = { version = "0.10.0", features = ["futures", "net", "file", "worker"] }
 zeroize = "1.6.0"
 async-trait = "0.1.72"
 mime = "0.3.17"
@@ -54,16 +57,25 @@ jsonwebtoken = "9.1.0"
 lunchbox = { version = "0.1.3", features = ["full-wasm"] }
 brotli = { version = "3.3.4", features = [] } #"simd"
 wee_alloc = "0.4.5"
-web-sys = {version = "0.3.64", features = ["Document", "Window","console","Event","FileReader", "File", "FileList", "HtmlInputElement"]}
+web-sys = { version = "0.3.64", features = [
+    "Document",
+    "Window",
+    "console",
+    "Event",
+    "FileReader",
+    "File",
+    "FileList",
+    "HtmlInputElement",
+] }
 time = { version = "0.3.28", features = ["serde", "wasm-bindgen"] }
-passkey = "0.1.0"
+passkey = "0.2.0"
 infer = "0.15.0"
-tokio = { version = "1.33.0", features = ["full"] }
 pkg-version = "1.0.0"
 wasm-bindgen-futures = "0.4.38"
-tokio-stream = "0.1.14"
 wasm-streams = "0.4.0"
 log = "0.4.20"
+tokio = { version = "1.33.0", features = ["full"], optional = true }
+tokio-stream = { version = "0.1.14", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.37"
@@ -82,4 +94,3 @@ target = "wasm32-unknown-unknown"
 # Tell 'rustc' to optimize for small code size.
 opt-level = "s"
 debug = false
-

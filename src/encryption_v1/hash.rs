@@ -2,12 +2,10 @@ use crate::constants::PASSWORD_STRENGTH_SCORE;
 use aes_gcm::aead::generic_array::{typenum, GenericArray};
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
-use sha3::{Digest, Sha3_512, Sha3_256};
 use base64::{
-    display,
-    engine::{general_purpose::STANDARD, Engine},
-    write,
+    engine::{Engine},
 };
+use sha3::{Digest, Sha3_256};
 
 #[derive(Debug, thiserror::Error)]
 pub enum PasswordHashErrors {
@@ -39,11 +37,10 @@ pub fn argon2id_hash_password(
     // the max length for salt is 64 bytes so it should work out fine.
     // Hash the password with argon2id and the salt which is sha512(email).
     //let salt = Salt::from_b64(&str::from_utf8(email_hash.as_slice()));
-    
+
     // Base64 expand size by 1/3
     let encoded = base64::engine::general_purpose::STANDARD_NO_PAD.encode(email_hash.as_slice());
-    let salt = SaltString::from_b64(&encoded)
-        .map_err(PasswordHashErrors::PasswordHashError)?;
+    let salt = SaltString::from_b64(&encoded).map_err(PasswordHashErrors::PasswordHashError)?;
     let argon2id = Argon2::default();
     let password_hash = argon2id
         .hash_password(password.as_bytes(), salt.as_salt())

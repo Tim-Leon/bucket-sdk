@@ -3,8 +3,8 @@ use crate::encryption_v1::module::{EncryptionModule, ZeroKnowledgeEncryptionModu
 use async_trait::async_trait;
 use bucket_common_types::BucketEncryption;
 use gloo::file::futures::read_as_bytes;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+
+
 
 #[derive(Clone)]
 pub struct BucketFileReader {
@@ -13,9 +13,6 @@ pub struct BucketFileReader {
     pub offset: u64,
 }
 
-pub struct SyncBucketDownloadHandlerFile {
-    inner: Arc<Mutex<BucketFileReader>>,
-}
 // A handler is created for each file upload. And will have multiple handlers running in parallel.
 #[async_trait(?Send)]
 pub trait BucketFileUploadHandler {
