@@ -1,0 +1,3 @@
+[submodule "bucket-api"]
+	path = bucket-api
+	url = https://github.com/Tim-Leon/bucket-api.git
