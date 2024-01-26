@@ -1,13 +1,13 @@
 use byte_unit::TryFromIntError;
-use infer::Type;
+
 use mime::Mime;
 
 
-use std::io::{BufRead, Read, Write};
+use std::io::{Read, Write};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::vec;
-use web_sys::ReadableStream;
+
 
 // Information from the API
 pub struct VirtualFileDetails {
@@ -146,11 +146,11 @@ impl BucketFileTrait for VirtualWebBucketFile {
         }
     }
 
-    fn write_chunk(&self, chunk: vec::Vec::<u8>, offset: u64) -> Result<(), Self::Error> {
+    fn write_chunk(&self, _chunk: vec::Vec::<u8>, _offset: u64) -> Result<(), Self::Error> {
         todo!()
     }
 
-    fn write_stream(&self, stream: &dyn Write) -> Result<(),Self::Error> {
+    fn write_stream(&self, _stream: &dyn Write) -> Result<(),Self::Error> {
         todo!()
     }
 

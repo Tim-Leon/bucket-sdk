@@ -92,7 +92,7 @@ pub async fn upload_files_to_bucket<FileHandle>(
         for upload_url in upload_urls.clone() {
             let url = url::Url::parse(upload_url.as_str())?;
             let chunk_size =
-                ((Byte::GIBIBYTE.as_u64() * 5) as u64) - filepath.file_size_in_bytes; //TODO: ???
+                (Byte::GIBIBYTE.as_u64() * 5) - filepath.file_size_in_bytes; //TODO: ???
                                                                                              //let chunk_size = GiB::from(1).to_bytes() as usize;
             upload_to_url(&url, chunk_size, &mut upload_handler)
                 .await
