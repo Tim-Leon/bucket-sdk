@@ -6,7 +6,7 @@ use bucket_common_types::exclusive_share_link::ExclusiveShareLink;
 use bucket_common_types::share_link::ShareLink;
 use bucket_common_types::DownloadFormat;
 
-use byte_unit::ByteUnit;
+use byte_unit::Byte;
 use gloo::{console::__macro::JsValue, net::http::Request};
 use tokio::io::AsyncReadExt;
 use tokio::io::BufReader;
@@ -92,7 +92,7 @@ pub async fn upload_files_to_bucket<FileHandle>(
         for upload_url in upload_urls.clone() {
             let url = url::Url::parse(upload_url.as_str())?;
             let chunk_size =
-                ((ByteUnit::GiB.get_unit_bytes() * 5) as u64) - filepath.file_size_in_bytes; //TODO: ???
+                ((Byte::GIBIBYTE.as_u64() * 5) as u64) - filepath.file_size_in_bytes; //TODO: ???
                                                                                              //let chunk_size = GiB::from(1).to_bytes() as usize;
             upload_to_url(&url, chunk_size, &mut upload_handler)
                 .await
@@ -127,7 +127,6 @@ pub async fn download_from_url<DH: BucketFileDownloadHandler + Clone, T>(
                     bucket_owner_id: secret.user_id.to_string(),
                     offset: None,
                     limit: None,
-                    filter: None,
                 },
             )
             .await

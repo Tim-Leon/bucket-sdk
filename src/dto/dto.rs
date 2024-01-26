@@ -13,7 +13,7 @@ use crate::{
         download_files_request::File, get_account_details_request::User, CreateBucketRequest,
         CreateBucketShareLinkRequest, CreateCheckoutRequest, DeleteAccountRequest,
         DeleteBucketRequest, DeleteFilesInBucketRequest, DownloadBucketRequest,
-        DownloadFilesRequest, GetAccountDetailsRequest, GetBucketDetailsFilter,
+        DownloadFilesRequest, GetAccountDetailsRequest,
         GetBucketDetailsRequest, GetBucketFilestructureRequest, MoveFilesInBucketRequest,
         UpdateAccountRequest, UpdateBucketRequest, UploadFilesToBucketRequest,
     },
@@ -144,7 +144,6 @@ pub struct GetBucketDetailsParams {
     pub bucket_owner_id: uuid::Uuid,
     pub offset: Option<u32>,
     pub limit: Option<u32>,
-    pub filter: Option<GetBucketDetailsFilter>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -165,7 +164,6 @@ impl TryInto<GetBucketDetailsRequest> for GetBucketDetailsParams {
             bucket_owner_id: self.bucket_owner_id.to_string(),
             offset: self.offset,
             limit: self.limit,
-            filter: self.filter,
         })
     }
 }
@@ -173,6 +171,7 @@ impl TryInto<GetBucketDetailsRequest> for GetBucketDetailsParams {
 pub struct UploadFile {
     pub target_directory: String,
     pub source_file: VirtualFileDetails,
+    pub content_type: mime::Mime,
 }
 
 pub struct UploadFilesParams {
@@ -200,11 +199,10 @@ impl TryInto<UploadFilesToBucketRequest> for UploadFilesParams {
                 acc.push(crate::query_client::backend_api::upload_files_to_bucket_request::File {
                     file_path: num.source_file.path.clone(),
                     size_in_bytes: num.source_file.size_in_bytes,
+                    content_type: num.content_type.to_string(),
                 });
                 acc
             }),
-            part_size_limit_in_bytes: todo!(),
-            total_size_in_bytes: self.total_size_in_bytes,
             hashed_password: self.hashed_password,
         })
     }
@@ -234,7 +232,7 @@ impl TryInto<DownloadFilesRequest> for DownloadFilesParams {
                 |mut acc, val| {
                     acc.push(File {
                         file_path: val.path.clone(),
-                        size_in_bytes: val.size_in_bytes as u32,
+                        size_in_bytes: val.size_in_bytes,
                     }); //TODO: fix
                     acc
                 },

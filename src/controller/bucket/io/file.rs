@@ -1,10 +1,12 @@
+use byte_unit::TryFromIntError;
 use infer::Type;
 use mime::Mime;
 
-use std::os::unix::prelude::FileExt;
 
+use std::io::{BufRead, Read, Write};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::vec;
 use web_sys::ReadableStream;
 
 // Information from the API
@@ -26,15 +28,16 @@ pub trait BucketFileTrait {
     fn new(detail: Arc<VirtualFileDetails>, file_handle: Option<Self::FileHandle>) -> Self;
     fn is_readable(&self) -> bool;
     fn get_file_handle(&self) -> &Option<Self::FileHandle>;
-    fn read_chunk(&self, size: u32, offset: u32) -> Result<Vec<u8>, Self::Error>;
-    fn read_stream(&self) -> Result<ReadableStream, Self::Error>;
+    fn read_chunk(&self, size: u64, offset: u64) -> Result<Vec<u8>, Self::Error>;
+    fn read_stream(&self) -> Result<Box<dyn Read>, Self::Error>;
     fn get_extension(&self) -> Result<String, Self::Error>;
     /// Get the mime-type from the extension.
     fn get_mime_type(&self) -> Result<Mime, Self::Error>;
     /// Uses the first couple of bytes in the file ot determine the mime-type
     fn infer_mime_type(&self) -> Result<infer::Type, Self::Error>;
-    fn write_chunk(&self);
-    fn write_stream(&self);
+    fn write_chunk(&self, chunk: vec::Vec::<u8>, offset: u64) -> Result<(), Self::Error>;
+    fn write_stream(&self, stream: &dyn Write) -> Result<(),Self::Error>;
+    fn get_size(&self) -> Option<u64>;
 }
 #[derive(thiserror::Error, Debug)]
 pub enum WebBucketFileError {
@@ -46,6 +49,8 @@ pub enum WebBucketFileError {
     Empty,
     #[error("No extension")]
     NoExtension,
+    #[error(transparent)]
+    TryFromIntError(#[from] TryFromIntError),
 }
 pub struct VirtualWebBucketFile {
     pub file_handle: Option<web_sys::HtmlInputElement>,
@@ -70,14 +75,14 @@ impl BucketFileTrait for VirtualWebBucketFile {
         &self.file_handle
     }
 
-    fn read_chunk(&self, size: u32, offset: u32) -> Result<Vec<u8>, Self::Error> {
+    fn read_chunk(&self, size: u64, offset: u64) -> Result<Vec<u8>, Self::Error> {
         match &self.file_handle {
             Some(x) => {
                 let file = x.files().unwrap();
                 let _rs = file.get(0).unwrap().stream();
                 let start = size - offset;
                 let str = file
-                    .get(offset)
+                    .get(offset.try_into()?)
                     .unwrap()
                     .slice_with_i32(i32::try_from(start).unwrap())
                     .unwrap()
@@ -95,18 +100,19 @@ impl BucketFileTrait for VirtualWebBucketFile {
         }
     }
 
-    fn read_stream(&self) -> Result<ReadableStream, Self::Error> {
-        match &self.file_handle {
-            Some(x) => {
-                let file = x.files().unwrap();
-                let rs = file.get(0).unwrap().stream();
-                Ok(rs)
-            }
-            None => {
-                // Can not read from file that does not have a corresponding handle attached.
-                Err(WebBucketFileError::NoFileHandle)
-            }
-        }
+    fn read_stream(&self) -> Result<Box<dyn Read>, Self::Error> {
+        todo!();
+        //match &self.file_handle {
+        //    Some(x) => {
+        //        let file = x.files().unwrap();
+        //        let rs = file.get(0).unwrap().stream();
+        //        Ok(rs)
+        //    }
+        //    None => {
+        //        // Can not read from file that does not have a corresponding handle attached.
+        //        Err(WebBucketFileError::NoFileHandle)
+        //    }
+        //}
     }
 
     fn get_extension(&self) -> Result<String, Self::Error> {
@@ -140,77 +146,20 @@ impl BucketFileTrait for VirtualWebBucketFile {
         }
     }
 
-    fn write_chunk(&self) {}
-
-    fn write_stream(&self) {
-        todo!()
-    }
-}
-
-struct VirtualNativeBucketFile {
-    pub file_details: Arc<VirtualFileDetails>,
-    pub file_handle: Option<std::fs::File>,
-}
-#[derive(thiserror::Error, Debug)]
-pub enum NativeBucketFileError {
-    #[error("NoFileToRead")]
-    NoFileToRead,
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-}
-impl BucketFileTrait for VirtualNativeBucketFile {
-    type Error = NativeBucketFileError;
-    type FileHandle = std::fs::File;
-
-    fn new(detail: Arc<VirtualFileDetails>, file_handle: Option<Self::FileHandle>) -> Self {
-        Self {
-            file_details: detail,
-            file_handle,
-        }
-    }
-
-    fn is_readable(&self) -> bool {
-        self.file_handle.is_some()
-    }
-
-    fn get_file_handle(&self) -> &Option<Self::FileHandle> {
-        &self.file_handle
-    }
-
-    fn read_chunk(&self, size: u32, offset: u32) -> Result<Vec<u8>, Self::Error> {
-        let mut buffer = Vec::with_capacity(size as usize);
-        match &self.file_handle {
-            None => Err(NativeBucketFileError::NoFileToRead),
-            Some(file) => {
-                file.read_at(buffer.as_mut_slice(), offset as u64)?;
-                Ok(buffer)
-            }
-        }
-    }
-
-    fn read_stream(&self) -> Result<ReadableStream, Self::Error> {
+    fn write_chunk(&self, chunk: vec::Vec::<u8>, offset: u64) -> Result<(), Self::Error> {
         todo!()
     }
 
-    fn get_extension(&self) -> Result<String, Self::Error> {
+    fn write_stream(&self, stream: &dyn Write) -> Result<(),Self::Error> {
         todo!()
     }
 
-    fn get_mime_type(&self) -> Result<Mime, Self::Error> {
+    fn get_size(&self) -> Option<u64> {
         todo!()
     }
 
-    fn infer_mime_type(&self) -> Result<Type, Self::Error> {
-        todo!()
-    }
 
-    fn write_chunk(&self) {
-        todo!()
-    }
 
-    fn write_stream(&self) {
-        todo!()
-    }
 }
 
 // Virtual files can either be in the cloud, or on the device. If they are already on the device the NativeBucketFile will be used.
