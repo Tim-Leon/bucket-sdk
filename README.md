@@ -1,5 +1,5 @@
 # Bucket-SDK
-[![Rust](https://github.com/Tim-Leon/bucket-sdk/actions/workflows/rust.yml/badge.svg)](https://github.com/Tim-Leon/bucket-sdk/actions/workflows/rust.yml)
+[![Rust](https://github.com/Tim-Leon/bucket-sdk/actions/workflows/rust.yml/badge.svg)](https://github.com/Tim-Leon/bucket-sdk/actions/workflows/rust.yml)  
 Welcome to the BucketDrive client repository! This centralized library houses the core code for our secure cloud file storage solution. It includes essential components such as file encryption protocol and Protobuf definitions, along with client.
 
 With this comprehensive library, developers can easily integrate BucketDrive's features into CLI tools and websites. Whether you're building a command-line interface or a user-friendly web application, this client library provides everything you need to interact with our cloud file storage platform seamlessly.
