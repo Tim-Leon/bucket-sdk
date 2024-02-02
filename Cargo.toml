@@ -38,7 +38,7 @@ tonic = { version = "0.10.2", default-features = false, features = [
 tonic-web-wasm-client = "0.5.0"
 anyhow = "*"
 base64 = "0.21.2"
-serde = "1.0.175"
+serde = "1.0.196"
 bytemuck = "1.13.1"
 gloo = { version = "0.11.0", features = ["futures", "net", "file", "worker"] }
 zeroize = "1.6.0"
@@ -47,11 +47,11 @@ mime = "0.3.17"
 wasm-bindgen = "0.2.87"
 byte-unit = "5.1.4"
 # zip = "0.6.6"
-strum = "0.25.0"
-strum_macros = "0.25.0"
+strum = "0.26.1"
+strum_macros = "0.26.1"
 cookie = { version = "0.18.0", features = ["private"] }
 hex-literal = "0.4.1"
-rust_decimal = "1.33.1"
+rust_decimal = "1.34.2"
 pharos = "0.5.3"
 jsonwebtoken = "9.1.0"
 lunchbox = { version = "0.1.3", features = ["full-wasm"] }
@@ -66,14 +66,14 @@ web-sys = { version = "0.3.64", features = [
     "FileList",
     "HtmlInputElement",
 ] }
-time = { version = "0.3.28", features = ["serde", "wasm-bindgen"] }
+time = { version = "0.3.32", features = ["serde", "wasm-bindgen"] }
 passkey = "0.2.0"
 infer = "0.15.0"
 pkg-version = "1.0.0"
 wasm-bindgen-futures = "0.4.38"
 wasm-streams = "0.4.0"
 log = "0.4.20"
-tokio = { version = "1.35.1", features = ["full"] }
+tokio = { version = "1.36.0", features = ["full"] }
 tokio-stream = { version = "0.1.14" }
 
 [dev-dependencies]
