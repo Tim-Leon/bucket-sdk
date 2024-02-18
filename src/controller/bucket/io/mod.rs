@@ -1,4 +1,5 @@
 pub mod file;
+#[cfg(target_family = "wasm")]
 mod web_file;
-#[cfg(feature = "native")]
-pub mod native_file;
+#[cfg(not(target_family = "wasm"))]
+mod native_file;

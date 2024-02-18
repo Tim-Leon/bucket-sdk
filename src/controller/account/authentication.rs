@@ -77,24 +77,24 @@ pub async fn login(
 
 pub async fn register(
     query_client: &mut QueryClient,
-    email: String,
-    username: String,
-    password: String,
-    captcha: String,
+    email: &str,
+    username: &str,
+    password: &str,
+    captcha: &str,
 ) -> Result<JwtToken, RegisterError> {
     if password_strength(&email, &password, None)? < PASSWORD_STRENGTH_SCORE {
         return Err(RegisterError::PasswordTooWeak);
     }
-    let secrets = encryption_v1::encryption::setup(password.as_str(), email.as_str())?;
+    let secrets = encryption_v1::encryption::setup(password, email)?;
     let mut rng = rand::thread_rng();
     let oprf_start =
         opaque_ke::ClientRegistration::<DefaultCipherSuite>::start(&mut rng, password.as_bytes())
             .unwrap();
 
     let start_req = CreateAccountStartRequest {
-        email,
+        email: email.to_string(),
         oprf: oprf_start.message.serialize().to_vec(),
-        captcha,
+        captcha: captcha.to_string(),
     };
     let start_resp = query_client
         .create_account_start(start_req)
@@ -110,7 +110,7 @@ pub async fn register(
 
     let finish_req = CreateAccountFinishRequest {
         oprf: oprf_finish.message.serialize().to_vec(),
-        username,
+        username: username.to_string(),
         session_id: start_resp.session_id,
         public_signing_key: secrets.get_ed25519_public_signing_key().as_slice().to_vec(),
     };

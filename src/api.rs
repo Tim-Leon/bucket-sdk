@@ -20,18 +20,20 @@ use crate::{
 };
 use std::rc::Rc;
 use std::str::FromStr;
+use crate::controller::account::authentication::register;
+use crate::controller::account::errors::RegisterError;
 
 pub struct ApiToken(String);
 
-pub struct BucketApi {
+pub struct BucketClient {
     client: QueryClient,
     api_token: String,
 }
 
-impl BucketApi {
+impl BucketClient {
     pub fn new(api_url: &url::Url, api_token: &str) -> Self {
         let client = QueryClient::build(api_url);
-        BucketApi {
+        BucketClient {
             client,
             api_token: api_token.to_string(),
         }
@@ -44,6 +46,16 @@ impl BucketApi {
         let api_token = std::env::var("API_TOKEN").unwrap();
         Self::new(&api_url, &api_token)
     }
+
+    pub async fn from_plaintext_credentials(api_url: &url::Url, email: &str, username: &str, password: &str, captcha: &str) -> Result<Self, RegisterError> {
+        let mut client = QueryClient::build(api_url);
+        let token = register(&mut client, email, username, password, captcha).await?;
+        Ok(Self {
+            client: client,
+            api_token: token.to_string(),
+        })
+    }
+
 
     pub async fn create_bucket(
         &mut self,

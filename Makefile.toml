@@ -8,3 +8,13 @@ args = ["update"]
 
 [tasks.build]
 dependencies = ["git-submodules-update"]
+
+[tasks.build-native]
+dependencies = ["git-submodules-update"]
+command = "cargo"
+args = ["build", "--target", ""]
+
+[tasks.build-web]
+dependencies = ["git-submodules-update"]
+command = "cargo"
+args = ["build","--target", "wasm32-unknown-unknown"]

@@ -6,12 +6,14 @@ use async_trait::async_trait;
 use bucket_common_types::BucketEncryption;
 use gloo::file::Blob;
 use mime::Mime;
+use crate::controller::bucket::io::file::{BucketFile, BucketFileTrait};
+
 
 #[derive(Debug, thiserror::Error)]
 pub enum BucketUploadHandlerErrors {}
 
 // A handler is create for each file download.
-#[async_trait(?Send)]
+#[async_trait(? Send)]
 pub trait BucketFileDownloadHandler {
     type Error: std::error::Error + Send + Sync + 'static;
     type DecryptionModule: DecryptionModule;
@@ -31,17 +33,24 @@ pub trait BucketFileDownloadHandler {
     fn on_download_finish(self) -> Result<(), Self::Error>;
 }
 
-#[derive(Clone)]
-pub struct BucketFileWriter {
-    write_target_file: gloo::file::File,
+//#[derive(Clone)]
+pub struct WebBucketFileWriter {
+    //write_target_file: gloo::file::File,
+    write_target_file: Box<
+        /*dyn BucketFileTrait<
+            Error = super::io::web_file::WebBucketFileError,
+            FileHandle = gloo::file::File,
+        >*/
+        BucketFile
+    >,
     pub offset: u64,
     pub decryption_module: Option<ZeroKnowledgeDecryptionModuleV1>,
     // Will be none if no encryption was used. Everything encryption related is handled by the module.
     pub is_checking_signature: bool, // TODO: Add support for this feature. The file will be checked against another file with special signature to ensure the signature matches against the supplied signature. This ensures the content can't be tampered with.
 }
 
-#[async_trait(?Send)]
-impl BucketFileDownloadHandler for BucketFileWriter {
+#[async_trait(? Send)]
+impl BucketFileDownloadHandler for WebBucketFileWriter {
     type Error = BucketDownloadHandlerErrors;
     type DecryptionModule = ZeroKnowledgeDecryptionModuleV1;
 
@@ -68,6 +77,7 @@ impl BucketFileDownloadHandler for BucketFileWriter {
             Some(mime.to_string().as_str()),
             None,
         );
+
         //write(self.write_target_file, );
         Ok(())
     }
@@ -77,20 +87,20 @@ impl BucketFileDownloadHandler for BucketFileWriter {
         //let end = chunk.len() as u64;
         //read_as_array_buffer(&self.write_target_file.slice(start, end), |res|{ res.unwrap(); });
         //self.write_target_file.
-        match &mut self.decryption_module {
+        let decrypted_buffer = match &mut self.decryption_module {
             Some(x) => {
                 let mut decrypted_buffer: Vec<u8> = chunk.clone();
                 decrypted_buffer = x.update(chunk)?;
-                //TODO: Write buffer to filesystem.
-                todo!()
+                decrypted_buffer
             }
             None => {
-                //chunk
-                //TODO: Write chunk directly to filesystem
-                todo!()
+                chunk
             }
         };
 
+        self.write_target_file
+            .write_chunk(decrypted_buffer, self.offset);
+        self.offset += decrypted_buffer.len();
         /*
          * Create custom object for URL to download the file.
          * The file will be stored as a "xxxx.temp" file. After the download the file is renamed to the correct filename.

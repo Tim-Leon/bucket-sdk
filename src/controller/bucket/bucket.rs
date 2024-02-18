@@ -7,14 +7,15 @@ use bucket_common_types::share_link::ShareLink;
 use bucket_common_types::DownloadFormat;
 
 use byte_unit::Byte;
+use futures::io::BufReader;
+use futures::AsyncReadExt;
+use futures::StreamExt;
 use gloo::{console::__macro::JsValue, net::http::Request};
-use tokio::io::AsyncReadExt;
-use tokio::io::BufReader;
+//use tokio::io::BufReader;
 
-use tokio_stream::StreamExt;
+//use tokio_stream::StreamExt;
 
 use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
-use crate::controller::bucket::download_handler::BucketFileWriter;
 use crate::query_client::backend_api::DownloadFilesRequest;
 
 use crate::query_client::{
@@ -41,8 +42,6 @@ use super::errors::BucketDownloadHandlerErrors;
 use super::io::file::VirtualFileDetails;
 
 pub type BucketFileUploadHandlerDyn = BucketFileReader;
-pub type BucketFileDownloadHandlerDyn = BucketFileWriter;
-
 pub struct UploadFileDescriptionState {
     pub file_path: String,
     pub size_in_bytes: u64,
@@ -56,14 +55,6 @@ pub async fn upload_files_to_bucket<FileHandle>(
     req: UploadFilesToBucketRequest,
     mut upload_handler: BucketFileUploadHandlerDyn,
 ) -> Result<(), UploadError> {
-    // let mut temp_source_files: Vec<backend_api::upload_files_to_bucket_request::File> =
-    //     Vec::with_capacity(source_files.len());
-    // for source_file in source_files {
-    //     temp_source_files.push(backend_api::upload_files_to_bucket_request::File {
-    //         file_path: source_file.path.clone(),
-    //         size_in_bytes: source_file.size_in_bytes,
-    //     });
-    // }
     let temp_source_files_len = req.source_files.len();
 
     let resp = client.upload_files_to_bucket(req).await.unwrap();
@@ -91,9 +82,8 @@ pub async fn upload_files_to_bucket<FileHandle>(
         let upload_urls = filepath.upload_urls.clone();
         for upload_url in upload_urls.clone() {
             let url = url::Url::parse(upload_url.as_str())?;
-            let chunk_size =
-                (Byte::GIBIBYTE.as_u64() * 5) - filepath.file_size_in_bytes; //TODO: ???
-                                                                                             //let chunk_size = GiB::from(1).to_bytes() as usize;
+            let chunk_size = (Byte::GIBIBYTE.as_u64() * 5) - filepath.file_size_in_bytes; //TODO: ???
+                                                                                          //let chunk_size = GiB::from(1).to_bytes() as usize;
             upload_to_url(&url, chunk_size, &mut upload_handler)
                 .await
                 .unwrap();
@@ -231,6 +221,7 @@ pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
                         path: file.file_path,
                         date: None,
                         size_in_bytes: file.file_size_in_bytes,
+                        file_format: todo!(),
                     };
 
                     let mut download_handler = create_file_download_handler_hook.handle(
@@ -284,6 +275,7 @@ pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
             path: file.file_path.clone(),
             date: None,
             size_in_bytes: file.file_size_in_bytes,
+            file_format: file.file_type,
         };
         let mut download_handler = create_download_handler.handle(
             virtual_file,
@@ -353,7 +345,7 @@ pub async fn donwload_from_url<DH: BucketFileDownloadHandler>(
     let body = resp.binary().await.unwrap();
     let mut chunk = Vec::<u8>::new();
     let mut stream = BufReader::new(body.as_ref());
-    while let Ok(size) = stream.read_buf(&mut chunk).await {
+    while let Ok(size) = stream.read(&mut chunk).await {
         if size == 0 {
             break;
         }
