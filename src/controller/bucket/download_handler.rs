@@ -1,13 +1,13 @@
 use crate::controller::bucket::errors::BucketDownloadHandlerErrors;
-use crate::encryption_v1::module::{
-    DecryptionModule, EncryptionModule, ZeroKnowledgeDecryptionModuleV1,
-};
+use crate::controller::bucket::io::file::{BucketFile, BucketFileTrait};
+use crate::encryption_v1::module::DecryptionModule;
+use crate::encryption_v1::module::EncryptionModule;
+use crate::encryption_v1::module::ZeroKnowledgeDecryptionModuleV1;
 use async_trait::async_trait;
 use bucket_common_types::BucketEncryption;
-use gloo::file::Blob;
+use futures::future::Either;
 use mime::Mime;
-use crate::controller::bucket::io::file::{BucketFile, BucketFileTrait};
-
+use std::str::FromStr;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BucketUploadHandlerErrors {}
@@ -41,7 +41,7 @@ pub struct WebBucketFileWriter {
             Error = super::io::web_file::WebBucketFileError,
             FileHandle = gloo::file::File,
         >*/
-        BucketFile
+        BucketFile,
     >,
     pub offset: u64,
     pub decryption_module: Option<ZeroKnowledgeDecryptionModuleV1>,
@@ -63,21 +63,27 @@ impl BucketFileDownloadHandler for WebBucketFileWriter {
         _encryption: Option<BucketEncryption>,
         _download_size_in_bytes: u64,
     ) -> Result<(), Self::Error> {
-        let blob = Blob::from(self.write_target_file.clone());
+        //let blob = Blob::from(self.write_target_file.clone());
         //let bytes = read_as_bytes(&blob).await?;
-        let mime: Mime = from_filename
-            .split('.')
-            .last()
-            .unwrap_or("application/octet-stream")
-            .parse()?;
+        let file = BucketFile::new(
+            from_filename.as_str(),
+            &Mime::from_str("application/octet-stream").unwrap(),
+        )
+        .unwrap();
 
-        self.write_target_file = gloo::file::File::new_with_options(
-            &from_filename,
-            blob,
-            Some(mime.to_string().as_str()),
-            None,
-        );
+        /*let mime: Mime = from_filename
+                    .split('.')
+                    .last()
+                    .unwrap_or("application/octet-stream")
+                    .parse()?;
 
+                self.write_target_file = gloo::file::File::new_with_options(
+                    &from_filename,
+                    blob,
+                    Some(mime.to_string().as_str()),
+                    None,
+                );
+        */
         //write(self.write_target_file, );
         Ok(())
     }
@@ -87,20 +93,28 @@ impl BucketFileDownloadHandler for WebBucketFileWriter {
         //let end = chunk.len() as u64;
         //read_as_array_buffer(&self.write_target_file.slice(start, end), |res|{ res.unwrap(); });
         //self.write_target_file.
-        let decrypted_buffer = match &mut self.decryption_module {
-            Some(x) => {
-                let mut decrypted_buffer: Vec<u8> = chunk.clone();
-                decrypted_buffer = x.update(chunk)?;
-                decrypted_buffer
+        let decrypted_buffer: futures::future::Either<Vec<u8>, &Vec<u8>> =
+            match &mut self.decryption_module {
+                Some(x) => {
+                    let mut decrypted_buffer: Vec<u8> = chunk.clone();
+                    decrypted_buffer = x.update(chunk)?;
+                    Either::Left(decrypted_buffer)
+                }
+                None => Either::Right(chunk),
+            };
+        match decrypted_buffer {
+            Either::Left(decrypted_buffer) => {
+                self.write_target_file
+                    .write_chunk(&decrypted_buffer, self.offset);
+                self.offset += decrypted_buffer.len() as u64;
             }
-            None => {
-                chunk
+            Either::Right(decrypted_buffer) => {
+                self.write_target_file
+                    .write_chunk(&decrypted_buffer, self.offset);
+                self.offset += decrypted_buffer.len() as u64;
             }
-        };
+        }
 
-        self.write_target_file
-            .write_chunk(decrypted_buffer, self.offset);
-        self.offset += decrypted_buffer.len();
         /*
          * Create custom object for URL to download the file.
          * The file will be stored as a "xxxx.temp" file. After the download the file is renamed to the correct filename.
@@ -119,8 +133,6 @@ impl BucketFileDownloadHandler for WebBucketFileWriter {
     }
     // Called when the last chunk has been downloaded.
     fn on_download_finish(self) -> Result<(), Self::Error> {
-        //let write_target_file = self.write_target_file;
-        //read_as_bytes(write_target_file);
         //TODO: Check if file match checksums.
         match self.decryption_module {
             None => {}

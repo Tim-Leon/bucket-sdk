@@ -62,11 +62,23 @@ pub struct VirtualWebBucketFile {
     filename: String,
 }
 
+#[async_trait(?Send)]
 impl BucketFileTrait for VirtualWebBucketFile {
     type Error = WebBucketFileError;
 
     type FileHandle = WebFileHandle;
-
+    fn new(filename: &str, mime:&Mime) -> Result<Self, Self::Error> where Self: Sized {
+        let file_handle = gloo::file::File::new_with_options(
+            &filename,
+            "",
+            Some(mime.to_string().as_str()),
+            None,
+        );
+        Ok(Self {
+            file_handle,
+            filename: filename.to_string(),
+        })
+    }
     fn from(file_handle: Self::FileHandle, filename: String) -> Self {
         Self {
             file_handle,
@@ -117,7 +129,7 @@ impl BucketFileTrait for VirtualWebBucketFile {
         }
     }
 
-    fn write_chunk(&self, chunk: vec::Vec<u8>, offset: u64) -> Result<(), Self::Error> {
+    fn write_chunk(&self, chunk: &vec::Vec<u8>, offset: u64) -> Result<(), Self::Error> {
         let web_file: &web_sys::File = self.file_handle.as_ref();
         let mut writable_stream = WritableStream::from_raw(web_file.stream().unchecked_into()).into_stream();
         let mut writer = writable_stream.get_writer();

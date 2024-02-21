@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt::Debug;
 use std::rc::Rc;
+use std::str::FromStr;
 
 use bucket_common_types::exclusive_share_link::ExclusiveShareLink;
 use bucket_common_types::share_link::ShareLink;
@@ -275,7 +276,7 @@ pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
             path: file.file_path.clone(),
             date: None,
             size_in_bytes: file.file_size_in_bytes,
-            file_format: file.file_type,
+            file_format: mime::Mime::from_str(file.file_format.as_str())?,
         };
         let mut download_handler = create_download_handler.handle(
             virtual_file,

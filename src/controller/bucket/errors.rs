@@ -41,6 +41,8 @@ pub enum DownloadError {
     GetBucketDetailsRequestFailed(#[source] tonic::Status),
     #[error("GetBucketDetailsFromUrlRequestFailed")]
     GetBucketDetailsFromUrlRequestFailed(#[source] tonic::Status),
+    #[error(transparent)]
+    FromStrError(#[from] FromStrError),
 }
 #[derive(Debug, thiserror::Error)]
 pub enum UploadToUrlError {

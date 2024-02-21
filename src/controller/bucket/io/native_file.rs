@@ -1,9 +1,12 @@
 use mime::{FromStrError, Mime};
+use tonic::async_trait;
 use std::{
     io::Write,
     os::unix::prelude::FileExt,
     str::FromStr,
 };
+use std::fs::File;
+use std::path::Path;
 
 use super::file::BucketFileTrait;
 
@@ -27,11 +30,18 @@ pub enum NativeBucketFileError {
     FromStrError(#[from] FromStrError),
 }
 
+#[async_trait(?Send)]
 impl BucketFileTrait for VirtualNativeBucketFile {
     type Error = NativeBucketFileError;
 
     type FileHandle = std::fs::File;
-
+    fn new(filename: &str, mime:&Mime) -> Result<Self, Self::Error> where Self: Sized {
+        let file = File::create(Path::new(filename))?;
+        Ok(Self {
+            file_handle: file,
+            filename: filename.to_string(),
+        })
+    }
     fn from(file_handle: Self::FileHandle, filename: String) -> Self {
         Self {
             file_handle,
@@ -39,8 +49,8 @@ impl BucketFileTrait for VirtualNativeBucketFile {
         }
     }
 
-    fn get_file_handle(&self) -> Self::FileHandle {
-        self.file_handle
+    fn get_file_handle(&self) -> &Self::FileHandle {
+        &self.file_handle
     }
 
     async fn read_chunk(&self, size: u64, offset: u64) -> Result<Vec<u8>, Self::Error> {
@@ -76,7 +86,7 @@ impl BucketFileTrait for VirtualNativeBucketFile {
         }
     }
 
-    fn write_chunk(&self, chunk: std::vec::Vec<u8>, offset: u64) -> Result<(), Self::Error> {
+    fn write_chunk(&self, chunk: &std::vec::Vec<u8>, offset: u64) -> Result<(), Self::Error> {
         todo!();
         self.file_handle.write_all(&chunk)?;
         Ok(())
@@ -92,58 +102,3 @@ impl BucketFileTrait for VirtualNativeBucketFile {
         self.file_handle.metadata().unwrap().len()
     }
 }
-
-// impl BucketFileTrait for VirtualNativeBucketFile {
-//     type Error = NativeBucketFileError;
-//     type FileHandle = std::fs::File;
-
-//     fn new(detail: Arc<VirtualFileDetails>, file_handle: Option<Self::FileHandle>) -> Self {
-//         Self {
-//             file_details: detail,
-//             file_handle,
-//         }
-//     }
-
-//     fn get_file_handle(&self) -> &Option<Self::FileHandle> {
-//         &self.file_handle
-//     }
-
-//     fn read_chunk(&self, size: u64, offset: u64) -> Result<Vec<u8>, Self::Error> {
-//         let mut buffer = Vec::with_capacity(size as usize);
-//         match &self.file_handle {
-//             None => Err(NativeBucketFileError::NoFileToRead),
-//             Some(file) => {
-//                 file.read_at(buffer.as_mut_slice(), offset)?;
-//                 Ok(buffer)
-//             }
-//         }
-//     }
-
-//     fn get_extension(&self) -> Result<String, Self::Error> {
-//         todo!()
-//     }
-
-//     fn get_mime_type(&self) -> Result<Mime, Self::Error> {
-//         todo!()
-//     }
-
-//     fn infer_mime_type(&self) -> Result<infer::Type, Self::Error> {
-//         todo!()
-//     }
-
-//     fn write_chunk(&self, chunk: std::vec::Vec<u8>, offset: u64) -> Result<(), Self::Error> {
-//         todo!()
-//     }
-
-//     fn write_stream(&self, stream: &dyn std::io::prelude::Write) -> Result<(), Self::Error> {
-//         todo!()
-//     }
-
-//     fn get_size(&self) -> Option<u64> {
-//         todo!()
-//     }
-
-//     fn read_stream(&self) -> Result<Box<dyn std::io::prelude::Read>, Self::Error> {
-//         todo!()
-//     }
-// }

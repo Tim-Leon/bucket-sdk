@@ -34,7 +34,7 @@ mod tests {
         let username = "awesomeusername".to_string();
         let password = "awesomepassword".to_string();
         let captcha = "".to_string();
-        authentication::register(&mut query_client, email, username, password, captcha)
+        authentication::register(&mut query_client, email.as_str(), username.as_str(), password.as_str(), captcha.as_str())
             .await
             .unwrap();
     }
