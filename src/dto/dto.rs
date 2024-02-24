@@ -20,27 +20,27 @@ use crate::{
 };
 
 pub struct CreateBucketParams {
-    target_user_id: uuid::Uuid,
-    //target_bucket_id: uuid::Uuid,
-    name: String,
-    visibility: Option<BucketVisibility>,
-    encryption: Option<BucketEncryption>,
-    password: Option<String>,
-    target_directory: String,
-    source_files: Vec<VirtualFileDetails>,
-    description: Option<String>,
-    storage_class: BucketStorageClass,
-    expire_at: Option<bucket_common_types::unix_timestamp::UnixTimestamp>,
-    expected_capacity: Option<u64>,
-    is_nsfw: bool,
-    is_searchable: bool,
-    is_sharable: bool,
-    is_bucket_cloneable: bool,
-    is_prepaid: bool,
-    bucket_compression: Option<BucketCompression>,
-    tags: Vec<String>,
-    //redundancy: Option<BucketRedundancy>,
-    total_size_in_bytes: usize, // Can not go over this value. Going over will result in overwriting previous writes. pretty much unexpected behavior.
+    pub target_user_id: uuid::Uuid,
+//  pub target_bucket_id: uuid::Uuid,
+    pub name: String,
+    pub visibility: Option<BucketVisibility>,
+    pub encryption: Option<BucketEncryption>,
+    pub password: Option<String>,
+    pub target_directory: String,
+    pub source_files: Vec<VirtualFileDetails>,
+    pub description: Option<String>,
+    pub storage_class: BucketStorageClass,
+    pub expire_at: Option<bucket_common_types::unix_timestamp::UnixTimestamp>,
+    pub expected_capacity: Option<u64>,
+    pub is_nsfw: bool,
+    pub is_searchable: bool,
+    pub is_sharable: bool,
+    pub is_bucket_cloneable: bool,
+    pub is_prepaid: bool,
+    pub bucket_compression: Option<BucketCompression>,
+    pub tags: Vec<String>,
+    //pub redundancy: Option<BucketRedundancy>,
+    pub total_size_in_bytes: usize, // Can not go over this value. Going over will result in overwriting previous writes. pretty much unexpected behavior.
 }
 #[derive(thiserror::Error, Debug)]
 pub enum CreateBucketParamsParsingError {}
@@ -87,25 +87,25 @@ impl TryInto<DeleteBucketRequest> for DeleteBucketParams {
 }
 
 pub struct UpdateBucketParams {
-    bucket_id: uuid::Uuid,
-    bucket_user_id: uuid::Uuid,
-    name: Option<String>,
-    visibility: Option<BucketVisibility>,
-    encryption: Option<BucketEncryption>,
-    password: Option<String>,
+    pub bucket_id: uuid::Uuid,
+    pub bucket_user_id: uuid::Uuid,
+    pub name: Option<String>,
+    pub visibility: Option<BucketVisibility>,
+    pub encryption: Option<BucketEncryption>,
+    pub password: Option<String>,
     //pre_alllocated_capacity_in_bytes: u64,
-    redundancy: Option<BucketRedundancy>,
-    region_cluster: Option<RegionCluster>,
-    description: Option<String>,
-    storage_class: Option<BucketStorageClass>,
-    opt_tags: Vec<String>,
-    expires_timestamp: Option<bucket_common_types::unix_timestamp::UnixTimestamp>,
-    expected_size_in_bytes: Option<u64>,
-    bucket_compression: Option<BucketCompression>,
-    is_nsfw: Option<bool>,
-    is_searchable: Option<bool>,
-    is_bucket_cloneable: Option<bool>,
-    is_sharable: Option<bool>,
+    pub redundancy: Option<BucketRedundancy>,
+    pub region_cluster: Option<RegionCluster>,
+    pub description: Option<String>,
+    pub storage_class: Option<BucketStorageClass>,
+    pub opt_tags: Vec<String>,
+    pub expires_timestamp: Option<bucket_common_types::unix_timestamp::UnixTimestamp>,
+    pub expected_size_in_bytes: Option<u64>,
+    pub bucket_compression: Option<BucketCompression>,
+    pub is_nsfw: Option<bool>,
+    pub is_searchable: Option<bool>,
+    pub is_bucket_cloneable: Option<bool>,
+    pub is_sharable: Option<bool>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -266,12 +266,12 @@ impl TryInto<DownloadBucketRequest> for DownloadBucketParams {
 }
 
 pub struct MoveFilesInBucketParams {
-    from_bucket_guid: BucketGuid,
-    to_bukcet_owner_id: Option<uuid::Uuid>,
-    to_bucket_id: uuid::Uuid,
-    from_filepaths: Vec<String>,
-    to_filepath: String,
-    is_capacity_destructive: bool,
+    pub from_bucket_guid: BucketGuid,
+    pub to_bukcet_owner_id: Option<uuid::Uuid>,
+    pub to_bucket_id: uuid::Uuid,
+    pub from_filepaths: Vec<String>,
+    pub to_filepath: String,
+    pub is_capacity_destructive: bool,
 }
 #[derive(thiserror::Error, Debug)]
 pub enum MoveFilesInBucketRequestParsingError {}
