@@ -2,9 +2,7 @@ use crate::constants::PASSWORD_STRENGTH_SCORE;
 use aes_gcm::aead::generic_array::{typenum, GenericArray};
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
-use base64::{
-    engine::{Engine},
-};
+use base64::engine::Engine;
 use sha3::{Digest, Sha3_256};
 
 #[derive(Debug, thiserror::Error)]

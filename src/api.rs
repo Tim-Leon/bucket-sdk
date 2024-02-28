@@ -1,14 +1,21 @@
 use crate::controller::bucket::bucket::{
-    bucket_download, download_files_from_bucket, CreateFileDownloadHandler,
+    bucket_download, download_files_from_bucket, upload_files_to_bucket, CreateFileDownloadHandler, DownloadFilesFromBucketError,
 };
 use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
 
-use crate::query_client::backend_api::{UpdateBucketRequest, UpdateBucketResponse};
+use crate::controller::account::authentication::register;
+use crate::controller::account::errors::RegisterError;
+use crate::controller::bucket::errors::{DownloadError, UploadError};
+use crate::controller::bucket::upload_handler::BucketFileReader;
+use crate::dto;
+
+use crate::dto::dto::{CreateBucketParams, CreateBucketParamsParsingError, CreateBucketShareLinkParams, CreateBucketShareLinkParamsParsingError, CreateCheckoutParams, CreateCheckoutParamsParsingError, DeleteAccountParams, DeleteAccountParamsParsingError, DeleteBucketParams, DeleteFilesInBucketParams, DeleteFilesInBucketParamsParsingError, DownloadBucketParams, DownloadBucketParamsParsingError, DownloadFilesParams, DownloadFilesParamsParsingError, GetAccountDetailsParams, GetAccountDetailsParamsParsingError, GetBucketDetailsParams, GetBucketDetailsRequestParsingError, GetFilesystemDetailsParams, GetFilesystemDetailsParamsParsingError, MoveFilesInBucketParams, MoveFilesInBucketRequestParsingError, ParseDeleteBucketRequestError, UpdateAccountParams, UpdateAccountParamsParsingError, UpdateBucketParams, UpdateBucketParamsParsingError, UploadFilesParams, UploadFilesRequestParsingError};
+use crate::query_client::backend_api::{
+    UpdateBucketRequest, UpdateBucketResponse, UploadFilesToBucketRequest,
+};
 use crate::query_client::QueryClient;
-use crate::{
-    dto::dto::*,
-    query_client::backend_api::{
-        CreateBucketRequest, CreateBucketResponse, CreateBucketShareLinkRequest,
+use crate::query_client::backend_api::{
+        CreateBucketResponse, CreateBucketShareLinkRequest,
         CreateBucketShareLinkResponse, CreateCheckoutRequest, CreateCheckoutResponse,
         DeleteAccountRequest, DeleteAccountResponse, DeleteBucketRequest,
         DeleteFilesInBucketRequest, DeleteFilesInBucketResponse, DownloadFilesRequest,
@@ -16,18 +23,60 @@ use crate::{
         GetBucketDetailsResponse, GetBucketFilestructureRequest, GetBucketFilestructureResponse,
         MoveFilesInBucketRequest, MoveFilesInBucketResponse, UpdateAccountRequest,
         UpdateAccountResponse,
-    },
-};
+    };
+use crate::query_client::backend_api::CreateBucketRequest;
 use std::rc::Rc;
 use std::str::FromStr;
-use crate::controller::account::authentication::register;
-use crate::controller::account::errors::RegisterError;
 
 pub struct ApiToken(String);
 
 pub struct BucketClient {
     client: QueryClient,
     api_token: String,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum BucketApiError {
+    // Parsing errors
+    #[error(transparent)]
+    CreateBucketParamsParsingError(#[from] CreateBucketParamsParsingError),
+    #[error(transparent)]
+    ParseDeleteBucketRequestError(#[from] ParseDeleteBucketRequestError),
+    #[error(transparent)]
+    GetBucketDetailsRequestParsingError(#[from] GetBucketDetailsRequestParsingError),
+    #[error(transparent)]
+    UploadFilesRequestParsingError(#[from] UploadFilesRequestParsingError),
+    #[error(transparent)]
+    MoveFilesInBucketRequestParsingError(#[from] MoveFilesInBucketRequestParsingError),
+    #[error(transparent)]
+    DeleteFilesInBucketParamsParsingError(#[from] DeleteFilesInBucketParamsParsingError),
+    #[error(transparent)]
+    DeleteAccountParamsParsingError(#[from] DeleteAccountParamsParsingError),
+    #[error(transparent)]
+    DownloadFilesParamsParsingError(#[from] DownloadFilesParamsParsingError),
+    #[error(transparent)]
+    DownloadBucketParamsParsingError(#[from] DownloadBucketParamsParsingError),
+    #[error(transparent)]
+    UpdateAccountParamsParsingError(#[from] UpdateAccountParamsParsingError),
+    #[error(transparent)]
+    GetFilesystemDetailsParamsParsingError(#[from] GetFilesystemDetailsParamsParsingError),
+    #[error(transparent)]
+    GetAccountDetailsParamsParsingError(#[from] GetAccountDetailsParamsParsingError),
+    #[error(transparent)]
+    CreateCheckoutParamsParsingError(#[from] CreateCheckoutParamsParsingError),
+    #[error(transparent)]
+    CreateBucketShareLinkParamsParsingError(#[from] CreateBucketShareLinkParamsParsingError),
+    #[error(transparent)]
+    UpdateBucketParamsParsingError(#[from] UpdateBucketParamsParsingError),
+
+    // Request handling/controller failed
+    #[error(transparent)]
+    DownloadFilesFromBucketError(#[from] DownloadFilesFromBucketError),
+
+    #[error(transparent)]
+    DownloadError(#[from] DownloadError),
+    #[error(transparent)]
+    UploadError(#[from] UploadError),
 }
 
 impl BucketClient {
@@ -47,7 +96,13 @@ impl BucketClient {
         Self::new(&api_url, &api_token)
     }
 
-    pub async fn from_plaintext_credentials(api_url: &url::Url, email: &str, username: &str, password: &str, captcha: &str) -> Result<Self, RegisterError> {
+    pub async fn from_plaintext_credentials(
+        api_url: &url::Url,
+        email: &str,
+        username: &str,
+        password: &str,
+        captcha: &str,
+    ) -> Result<Self, RegisterError> {
         let mut client = QueryClient::build(api_url);
         let token = register(&mut client, email, username, password, captcha).await?;
         Ok(Self {
@@ -55,7 +110,6 @@ impl BucketClient {
             api_token: token.to_string(),
         })
     }
-
 
     pub async fn create_bucket(
         &mut self,
@@ -94,22 +148,15 @@ impl BucketClient {
             .unwrap()
             .into_inner())
     }
-    // pub async fn upload_files_to_bucket<EncryptionModuleError>(
-    //     &mut self,
-    //     _param: UploadFilesParams,
-    //     encryption_module: Box<dyn EncryptionModule<Error = EncryptionModuleError>>,
-    // ) -> Result<(), BucketApiError> {
-    //     let req: UploadFilesToBucketRequest = _param.try_into()?;
-    //     for file in _param.source_files {
-    //         let upload_handler = BucketFileReader {
-    //             read_target_file: file.source_file.get_filehandle(),
-    //             encryption_module: encryption_module.clone(),
-    //             offset: 0,
-    //         };
-    //         upload_files_to_bucket(&mut self.client, req, upload_handler).await?;
-    //     }
-    //     Ok(())
-    // }
+    pub async fn upload_files_to_bucket(
+        &mut self,
+        param: UploadFilesParams,
+        upload_file_handler: BucketFileReader,
+    ) -> Result<(), BucketApiError> {
+        let req: UploadFilesToBucketRequest = param.try_into()?;
+        upload_files_to_bucket(&mut self.client, req, upload_file_handler).await?;
+        Ok(())
+    }
 
     ///https://repost.aws/questions/QUxynkZDbASDaqrUcpx_sILQ/s3-support-multiple-byte-ranges-download
     pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
@@ -246,37 +293,4 @@ impl BucketClient {
             .unwrap()
             .into_inner())
     }
-
-    // async fn create_virtual_filesystem(
-    //     bucket_id: uuid::Uuid,
-    //     bucket_owner_id: uuid::Uuid,
-    //     password: Option<String>,
-    // ) -> BucketVirtualFilesystemManager {
-    //     let bucket_upload_handle:BucketFileUploadHandlerDyn = BucketFileUploadHandlerImpl;
-    //     let client = QueryClient::new(Client { base_url: "".to_string(), options: None });
-    //     BucketVirtualFilesystemManager::new(client, bucket_id, bucket_owner_id, password)
-    // }
-    //
-    // async fn create_bucket<FileHandle>(&mut self, params:&CreateBucketParams<FileHandle>) -> Result<(),()> {
-    //     let bucket_upload_handle:BucketFileUploadHandlerDyn = BucketFileUploadHandlerImpl::;
-    //     crate::controller::bucket::upload(&mut self.client, &params.target_user_id, &params.target_bucket_id, &params.target_directory, &params.source_files, &params.encryption, &params.total_size_in_bytes, &params.hashed_password, bucket_upload_handle).await.unwrap();
-    // }
-    //
-    // async fn upload_files<FileHandle>(&mut self, params:&UploadFilesDto<FileHandle>) {
-    //     let bucket_file_handler = BucketFileUploadHandlerImpl::;
-    //     upload(&mut self.client, &params.target_user_id, &params.target_bucket_id, &params.target_directory, &params.source_files, params.encryption, params.total_size_in_bytes, params.hashed_password, Arc::new(()));
-    // }
-    //
-    // async fn download_files(&mut self, params:&DownloadFilesDto) {
-    //     let download_handler = BucketFileDownloadHandlerDyn::;
-    //     download(&mut self.client, &params.user_id, &params.bucket_id, &params.hashed_password, &params.bucket_encryption, &params.keep_file_structure, &download_handler);
-    // }
-    // async fn delete_files(&self, dto:&DeleteFilesDto) {
-    //     delete_file()
-    // }
-    //
-    // async fn delete_bucket(&self, dto:&DeleteBucketDto) {
-    //
-    //     delete_bucket()
-    // }
 }

@@ -1,12 +1,8 @@
 use mime::{FromStrError, Mime};
-use tonic::async_trait;
-use std::{
-    io::Write,
-    os::unix::prelude::FileExt,
-    str::FromStr,
-};
 use std::fs::File;
 use std::path::Path;
+use std::{io::Write, os::unix::prelude::FileExt, str::FromStr};
+use tonic::async_trait;
 
 use super::file::BucketFileTrait;
 
@@ -15,6 +11,7 @@ pub struct VirtualNativeBucketFile {
     //pub file_handle: Option<std::fs::File>,
     file_handle: std::fs::File,
     filename: String, // Must have because, unix system lack the ability to reverse file descriptor into a path.
+    file_type: Mime,
 }
 #[derive(thiserror::Error, Debug)]
 pub enum NativeBucketFileError {
@@ -35,17 +32,23 @@ impl BucketFileTrait for VirtualNativeBucketFile {
     type Error = NativeBucketFileError;
 
     type FileHandle = std::fs::File;
-    fn new(filename: &str, mime:&Mime) -> Result<Self, Self::Error> where Self: Sized {
+    fn new(filename: &str, mime: &Mime) -> Result<Self, Self::Error>
+    where
+        Self: Sized,
+    {
         let file = File::create(Path::new(filename))?;
         Ok(Self {
             file_handle: file,
             filename: filename.to_string(),
+            file_type: mime.clone(),
         })
     }
-    fn from(file_handle: Self::FileHandle, filename: String) -> Self {
+
+    fn from(file_handle: Self::FileHandle, filename: String, mime: &Mime) -> Self {
         Self {
             file_handle,
             filename,
+            file_type: mime.clone(),
         }
     }
 

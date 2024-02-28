@@ -1,13 +1,21 @@
-use crate::controller::bucket::errors::BucketDownloadHandlerErrors;
 use crate::controller::bucket::io::file::{BucketFile, BucketFileTrait};
-use crate::encryption_v1::module::DecryptionModule;
-use crate::encryption_v1::module::EncryptionModule;
-use crate::encryption_v1::module::ZeroKnowledgeDecryptionModuleV1;
+use crate::encryption_v1::decryption_module::{
+    DecryptionError, DecryptionModule, ZeroKnowledgeDecryptionModuleV1,
+};
 use async_trait::async_trait;
 use bucket_common_types::BucketEncryption;
 use futures::future::Either;
-use mime::Mime;
+use mime::{FromStrError, Mime};
 use std::str::FromStr;
+#[derive(Debug, thiserror::Error)]
+pub enum BucketDownloadHandlerErrors {
+    #[error(transparent)]
+    FromStrError(#[from] FromStrError),
+    #[error(transparent)]
+    FileReaderError(#[from] gloo::file::FileReadError),
+    #[error(transparent)]
+    DecryptionError(#[from] DecryptionError),
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum BucketUploadHandlerErrors {}
@@ -36,13 +44,7 @@ pub trait BucketFileDownloadHandler {
 //#[derive(Clone)]
 pub struct WebBucketFileWriter {
     //write_target_file: gloo::file::File,
-    write_target_file: Box<
-        /*dyn BucketFileTrait<
-            Error = super::io::web_file::WebBucketFileError,
-            FileHandle = gloo::file::File,
-        >*/
-        BucketFile,
-    >,
+    write_target_file: Box<BucketFile>,
     pub offset: u64,
     pub decryption_module: Option<ZeroKnowledgeDecryptionModuleV1>,
     // Will be none if no encryption was used. Everything encryption related is handled by the module.
@@ -70,29 +72,10 @@ impl BucketFileDownloadHandler for WebBucketFileWriter {
             &Mime::from_str("application/octet-stream").unwrap(),
         )
         .unwrap();
-
-        /*let mime: Mime = from_filename
-                    .split('.')
-                    .last()
-                    .unwrap_or("application/octet-stream")
-                    .parse()?;
-
-                self.write_target_file = gloo::file::File::new_with_options(
-                    &from_filename,
-                    blob,
-                    Some(mime.to_string().as_str()),
-                    None,
-                );
-        */
-        //write(self.write_target_file, );
         Ok(())
     }
     // Called when a chunk is downloaded. It's up to the user to decrypt the chunk if the bucket is encrypted, or to save the chunk to a file.
     async fn on_download_chunk(&mut self, chunk: &Vec<u8>) -> Result<(), Self::Error> {
-        //let start = 0;
-        //let end = chunk.len() as u64;
-        //read_as_array_buffer(&self.write_target_file.slice(start, end), |res|{ res.unwrap(); });
-        //self.write_target_file.
         let decrypted_buffer: futures::future::Either<Vec<u8>, &Vec<u8>> =
             match &mut self.decryption_module {
                 Some(x) => {

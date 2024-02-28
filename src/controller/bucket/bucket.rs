@@ -39,10 +39,9 @@ use crate::query_client::backend_api::{
     GetBucketDetailsFromUrlRequest, GetBucketDetailsFromUrlResponse,
 };
 
-use super::errors::BucketDownloadHandlerErrors;
+use super::download_handler::BucketDownloadHandlerErrors;
 use super::io::file::VirtualFileDetails;
 
-pub type BucketFileUploadHandlerDyn = BucketFileReader;
 pub struct UploadFileDescriptionState {
     pub file_path: String,
     pub size_in_bytes: u64,
@@ -51,10 +50,10 @@ pub struct UploadFileDescriptionState {
 //TODO: Most of these should just take a raw request instead of declearing the type and checking it. Do that in api.rs layer instead.
 
 //TODO: Move to params to DTO layer.
-pub async fn upload_files_to_bucket<FileHandle>(
+pub async fn upload_files_to_bucket(
     client: &mut QueryClient,
     req: UploadFilesToBucketRequest,
-    mut upload_handler: BucketFileUploadHandlerDyn,
+    mut upload_handler: BucketFileReader,
 ) -> Result<(), UploadError> {
     let temp_source_files_len = req.source_files.len();
 
@@ -167,6 +166,8 @@ pub enum DownloadFilesFromBucketError {
     DownloadFinishError(Box<dyn Error + 'static>),
     #[error(transparent)]
     DownloadFromUrlError(#[from] DownloadFromUrlError),
+    #[error(transparent)]
+    FromStrError(#[from] mime::FromStrError),
 }
 
 impl From<BucketDownloadHandlerErrors> for DownloadFilesFromBucketError {
@@ -222,7 +223,7 @@ pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
                         path: file.file_path,
                         date: None,
                         size_in_bytes: file.file_size_in_bytes,
-                        file_format: todo!(),
+                        file_format: mime::Mime::from_str(file.file_format.as_str())?,
                     };
 
                     let mut download_handler = create_file_download_handler_hook.handle(

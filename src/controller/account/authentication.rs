@@ -75,7 +75,6 @@ pub async fn login(
     Ok(finish_resp.jwt_token as JwtToken)
 }
 
-
 pub async fn register(
     query_client: &mut QueryClient,
     email: &str,

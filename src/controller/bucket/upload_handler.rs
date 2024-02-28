@@ -1,14 +1,21 @@
-use crate::controller::bucket::errors::BucketDownloadHandlerFileErrors;
-use crate::encryption_v1::module::{EncryptionModule, ZeroKnowledgeEncryptionModuleV1};
+use crate::encryption_v1::encryption_module::{EncryptionError, EncryptionModule, ZeroKnowledgeEncryptionModuleV1};
 use async_trait::async_trait;
 use bucket_common_types::BucketEncryption;
-use gloo::file::futures::read_as_bytes;
 
+use super::io::file::{BucketFile, BucketFileTrait};
 
+#[derive(Debug, thiserror::Error)]
+pub enum BucketDownloadHandlerFileErrors {
+    #[error("Encryption module not initialized when bucket is encrypted.")]
+    EncryptionModuleNotInitialized,
+    #[error(transparent)]
+    FileReaderError(#[from] gloo::file::FileReadError),
+    #[error(transparent)]
+    EncryptionError(#[from] EncryptionError),
+}
 
-#[derive(Clone)]
 pub struct BucketFileReader {
-    pub read_target_file: gloo::file::File, //Arc<Mutex<_>
+    pub read_target_file: BucketFile,
     pub encryption_module: Option<ZeroKnowledgeEncryptionModuleV1>,
     pub offset: u64,
 }
@@ -47,7 +54,6 @@ impl BucketFileUploadHandler for BucketFileReader {
         bucket_encryption: Option<BucketEncryption>,
         _upload_size_in_bytes: u64,
     ) -> Result<u64, Self::Error> {
-        wasm_bindgen_futures::spawn_local(async move {});
         match bucket_encryption {
             Some(_bucket_encryption) => match &self.encryption_module {
                 Some(_encryption_module) => {}
@@ -58,17 +64,15 @@ impl BucketFileUploadHandler for BucketFileReader {
             None => {}
         };
 
-        let size = self.read_target_file.size();
+        let size = self.read_target_file.get_size();
         Ok(size)
     }
 
     async fn on_upload_chunk(&mut self, chunk_size: u64) -> Result<Vec<u8>, Self::Error> {
-        let bytes = read_as_bytes(&self.read_target_file.slice(self.offset, chunk_size)).await?;
-        // let reader = read_as_array_buffer(blob, |buffer|(&self){
-        //     self.on_donwload_chunk();
-        //     let bytes = js_sys::Uint8Array::new(&buffer).to_vec();
-        //     let r_bytes = byte;
-        // });
+        let bytes = self
+            .read_target_file
+            .read_chunk(chunk_size, self.offset)
+            .await.unwrap();
 
         match &mut self.encryption_module {
             Some(x) => {

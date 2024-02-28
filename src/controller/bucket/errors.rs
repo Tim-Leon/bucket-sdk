@@ -1,27 +1,9 @@
-use crate::encryption_v1::module::{DecryptionError, EncryptionError};
 use mime::FromStrError;
 use std::convert::Infallible;
 use std::sync::PoisonError;
 
-#[derive(Debug, thiserror::Error)]
-pub enum BucketDownloadHandlerFileErrors {
-    #[error("Encryption module not initialized when bucket is encrypted.")]
-    EncryptionModuleNotInitialized,
-    #[error(transparent)]
-    FileReaderError(#[from] gloo::file::FileReadError),
-    #[error(transparent)]
-    EncryptionError(#[from] EncryptionError),
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum BucketDownloadHandlerErrors {
-    #[error(transparent)]
-    FromStrError(#[from] FromStrError),
-    #[error(transparent)]
-    FileReaderError(#[from] gloo::file::FileReadError),
-    #[error(transparent)]
-    DecryptionError(#[from] DecryptionError),
-}
+use super::download_handler::BucketDownloadHandlerErrors;
+use super::upload_handler::BucketDownloadHandlerFileErrors;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DownloadError {

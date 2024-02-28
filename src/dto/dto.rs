@@ -7,21 +7,21 @@ use crate::{
     controller::bucket::{
         bucket::DownloadFilesFromBucketError,
         errors::{DownloadError, UploadError},
-        io::file::VirtualFileDetails,
+        io::file::{BucketFile, BucketFileTrait, VirtualFileDetails},
     },
     query_client::backend_api::{
         download_files_request::File, get_account_details_request::User, CreateBucketRequest,
         CreateBucketShareLinkRequest, CreateCheckoutRequest, DeleteAccountRequest,
         DeleteBucketRequest, DeleteFilesInBucketRequest, DownloadBucketRequest,
-        DownloadFilesRequest, GetAccountDetailsRequest,
-        GetBucketDetailsRequest, GetBucketFilestructureRequest, MoveFilesInBucketRequest,
-        UpdateAccountRequest, UpdateBucketRequest, UploadFilesToBucketRequest,
+        DownloadFilesRequest, GetAccountDetailsRequest, GetBucketDetailsRequest,
+        GetBucketFilestructureRequest, MoveFilesInBucketRequest, UpdateAccountRequest,
+        UpdateBucketRequest, UploadFilesToBucketRequest,
     },
 };
 
 pub struct CreateBucketParams {
     pub target_user_id: uuid::Uuid,
-//  pub target_bucket_id: uuid::Uuid,
+    //  pub target_bucket_id: uuid::Uuid,
     pub name: String,
     pub visibility: Option<BucketVisibility>,
     pub encryption: Option<BucketEncryption>,
@@ -170,8 +170,8 @@ impl TryInto<GetBucketDetailsRequest> for GetBucketDetailsParams {
 
 pub struct UploadFile {
     pub target_directory: String,
-    pub source_file: VirtualFileDetails,
-    pub content_type: mime::Mime,
+    pub source_file: BucketFile,
+    //pub content_type: mime::Mime,
 }
 
 pub struct UploadFilesParams {
@@ -185,7 +185,9 @@ pub struct UploadFilesParams {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum UploadFilesRequestParsingError {}
+pub enum UploadFilesRequestParsingError {
+    
+}
 
 impl TryInto<UploadFilesToBucketRequest> for UploadFilesParams {
     type Error = UploadFilesRequestParsingError;
@@ -197,9 +199,9 @@ impl TryInto<UploadFilesToBucketRequest> for UploadFilesParams {
             target_directory: self.target_directory,
             source_files: self.source_files.iter().fold(Vec::<crate::query_client::backend_api::upload_files_to_bucket_request::File>::with_capacity(self.source_files.len()), |mut acc, num| {
                 acc.push(crate::query_client::backend_api::upload_files_to_bucket_request::File {
-                    file_path: num.source_file.path.clone(),
-                    size_in_bytes: num.source_file.size_in_bytes,
-                    content_type: num.content_type.to_string(),
+                    file_path: num.target_directory.clone(),
+                    size_in_bytes: num.source_file.get_size(),
+                    content_type:  num.source_file.get_mime_type().unwrap().to_string(),
                 });
                 acc
             }),
@@ -437,48 +439,4 @@ impl TryInto<CreateBucketShareLinkRequest> for CreateBucketShareLinkParams {
             is_secret_share_link: self.is_secret_share_link,
         })
     }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum BucketApiError {
-    // Parsing errors
-    #[error(transparent)]
-    CreateBucketParamsParsingError(#[from] CreateBucketParamsParsingError),
-    #[error(transparent)]
-    ParseDeleteBucketRequestError(#[from] ParseDeleteBucketRequestError),
-    #[error(transparent)]
-    GetBucketDetailsRequestParsingError(#[from] GetBucketDetailsRequestParsingError),
-    #[error(transparent)]
-    UploadFilesRequestParsingError(#[from] UploadFilesRequestParsingError),
-    #[error(transparent)]
-    MoveFilesInBucketRequestParsingError(#[from] MoveFilesInBucketRequestParsingError),
-    #[error(transparent)]
-    DeleteFilesInBucketParamsParsingError(#[from] DeleteFilesInBucketParamsParsingError),
-    #[error(transparent)]
-    DeleteAccountParamsParsingError(#[from] DeleteAccountParamsParsingError),
-    #[error(transparent)]
-    DownloadFilesParamsParsingError(#[from] DownloadFilesParamsParsingError),
-    #[error(transparent)]
-    DownloadBucketParamsParsingError(#[from] DownloadBucketParamsParsingError),
-    #[error(transparent)]
-    UpdateAccountParamsParsingError(#[from] UpdateAccountParamsParsingError),
-    #[error(transparent)]
-    GetFilesystemDetailsParamsParsingError(#[from] GetFilesystemDetailsParamsParsingError),
-    #[error(transparent)]
-    GetAccountDetailsParamsParsingError(#[from] GetAccountDetailsParamsParsingError),
-    #[error(transparent)]
-    CreateCheckoutParamsParsingError(#[from] CreateCheckoutParamsParsingError),
-    #[error(transparent)]
-    CreateBucketShareLinkParamsParsingError(#[from] CreateBucketShareLinkParamsParsingError),
-    #[error(transparent)]
-    UpdateBucketParamsParsingError(#[from] UpdateBucketParamsParsingError),
-
-    // Request handling/controller failed
-    #[error(transparent)]
-    DownloadFilesFromBucketError(#[from] DownloadFilesFromBucketError),
-
-    #[error(transparent)]
-    DownloadError(#[from] DownloadError),
-    #[error(transparent)]
-    UploadError(#[from] UploadError),
 }

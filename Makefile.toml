@@ -8,6 +8,9 @@ args = ["update"]
 
 [tasks.build]
 dependencies = ["git-submodules-update"]
+command = "cargo"
+args = ["build-all-features"]
+install_crate = "cargo-all-features"
 
 [tasks.build-native]
 dependencies = ["git-submodules-update"]
