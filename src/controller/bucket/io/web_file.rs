@@ -27,7 +27,9 @@ pub enum WebBucketFileError {
     TryFromIntError(#[from] TryFromIntError),
     #[error(transparent)]
     FromStrError(#[from] FromStrError),
+
 }
+
 
 #[derive(thiserror::Error, Debug)]
 pub enum ConvertHtmlInputElementToFileListError {
@@ -66,10 +68,7 @@ impl BucketFileTrait for VirtualWebBucketFile {
     type Error = WebBucketFileError;
 
     type FileHandle = WebFileHandle;
-    fn new(filename: &str, mime: &Mime) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn new(filename: &str, mime:&Mime) -> Result<Self, Self::Error> where Self: Sized {
         let file_handle = gloo::file::File::new_with_options(
             &filename,
             "",
@@ -79,6 +78,7 @@ impl BucketFileTrait for VirtualWebBucketFile {
         Ok(Self {
             file_handle,
             filename: filename.to_string(),
+            file_type: mime,
         })
     }
     fn from(file_handle: Self::FileHandle, filename: String, mime: &Mime) -> Self {
@@ -111,8 +111,7 @@ impl BucketFileTrait for VirtualWebBucketFile {
     }
 
     fn get_extension(&self) -> Result<String, Self::Error> {
-        let extension = self
-            .filename
+        let extension = self.filename
             .rsplit_once('.')
             .ok_or(WebBucketFileError::NoExtension)?;
         let (_, extension) = extension; // Unwrap the result
@@ -135,8 +134,7 @@ impl BucketFileTrait for VirtualWebBucketFile {
 
     fn write_chunk(&self, chunk: &vec::Vec<u8>, offset: u64) -> Result<(), Self::Error> {
         let web_file: &web_sys::File = self.file_handle.as_ref();
-        let mut writable_stream =
-            WritableStream::from_raw(web_file.stream().unchecked_into()).into_stream();
+        let mut writable_stream = WritableStream::from_raw(web_file.stream().unchecked_into()).into_stream();
         let mut writer = writable_stream.get_writer();
 
         let array = Uint8Array::new_with_length(chunk.len() as u32);
@@ -149,8 +147,7 @@ impl BucketFileTrait for VirtualWebBucketFile {
 
     fn write_stream(&self, stream: &dyn Write) -> Result<(), Self::Error> {
         let web_file: &web_sys::File = self.file_handle.as_ref();
-        let mut writable_stream =
-            WritableStream::from_raw(web_file.stream().unchecked_into()).into_stream();
+        let mut writable_stream = WritableStream::from_raw(web_file.stream().unchecked_into()).into_stream();
         let mut writer = writable_stream.get_writer();
 
         todo!()
@@ -179,19 +176,14 @@ mod tests {
 
     // Would have to use trunk test which is still under development https://github.com/trunk-rs/trunk/issues/20
     fn test_write_to_web_file() {
-        // https://stackoverflow.com/questions/76855488/no-click-method-defined-on-element-when-created-via-web-sys
+        // https://stackoverflow.com/questions/76855488/no-click-method-defined-on-element-when-created-via-web-sys 
         let document: Document = web_sys::window().unwrap().document().unwrap();
         document.create_element("input");
         let input: Element = document.create_element("input").unwrap();
         input.set_attribute("type", "file").unwrap();
         // For debugging purposes, save a reference to a global variable so I can inspect it from the JavaScript console
         let input_jsval: JsValue = input.clone().into();
-        js_sys::Reflect::set(
-            &js_sys::global(),
-            &JsValue::from_str("debug_input"),
-            &input_jsval,
-        )
-        .unwrap();
+        js_sys::Reflect::set(&js_sys::global(), &JsValue::from_str("debug_input"), &input_jsval).unwrap();
 
         // Attempt to click it
         let input_html_element: HtmlElement = input_jsval.clone().into();

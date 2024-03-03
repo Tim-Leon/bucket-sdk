@@ -223,7 +223,7 @@ pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
                         path: file.file_path,
                         date: None,
                         size_in_bytes: file.file_size_in_bytes,
-                        file_format: mime::Mime::from_str(file.file_format.as_str())?,
+                        //file_format: mime::Mime::from_str(file.file_format.as_str())?,
                     };
 
                     let mut download_handler = create_file_download_handler_hook.handle(
@@ -277,7 +277,7 @@ pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
             path: file.file_path.clone(),
             date: None,
             size_in_bytes: file.file_size_in_bytes,
-            file_format: mime::Mime::from_str(file.file_format.as_str())?,
+            //file_format: mime::Mime::from_str(file.file_format.as_str())?,
         };
         let mut download_handler = create_download_handler.handle(
             virtual_file,

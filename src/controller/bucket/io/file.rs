@@ -15,7 +15,7 @@ pub struct VirtualFileDetails {
     pub path: String,
     pub date: Option<time::OffsetDateTime>,
     pub size_in_bytes: u64,
-    pub file_format: mime::Mime,
+    //pub file_format: mime::Mime,
 }
 
 /// Traits to collectively implement the read/write to the local filesystem depending on target.
