@@ -26,8 +26,6 @@ pub struct CreateBucketParams {
     pub visibility: Option<BucketVisibility>,
     pub encryption: Option<BucketEncryption>,
     pub password: Option<String>,
-    pub target_directory: String,
-    pub source_files: Vec<VirtualFileDetails>,
     pub description: Option<String>,
     pub storage_class: BucketStorageClass,
     pub expire_at: Option<bucket_common_types::unix_timestamp::UnixTimestamp>,
