@@ -430,12 +430,12 @@ async fn delete_files_in_bucket(
 async fn get_filesystem_details(
     mut client: QueryClient,
     req: GetBucketFilestructureRequest,
-) -> Result<Option<backend_api::Directory>, GetFilesystemDetailsError> {
+) -> Result<Vec<backend_api::File>, GetFilesystemDetailsError> {
     let resp = client.get_bucket_filestructure(req).await?.into_inner();
-    let directory = match resp.filesystem {
-        Some(filesystem) => filesystem.root,
+    let files = match resp.filesystem {
+        Some(filesystem) => filesystem.files,
         None => return Err(GetFilesystemDetailsError::EmptyFilesystem),
     };
     resp.continuation_token;
-    Ok(directory)
+    Ok(files)
 }

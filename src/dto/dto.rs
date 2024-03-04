@@ -9,14 +9,14 @@ use crate::{
         errors::{DownloadError, UploadError},
         io::file::{BucketFile, BucketFileTrait, VirtualFileDetails},
     },
-    query_client::backend_api::{
-        download_files_request::File, get_account_details_request::User, CreateBucketRequest,
+    query_client::{self, backend_api::{
+        download_files_request::File, CreateBucketRequest,
         CreateBucketShareLinkRequest, CreateCheckoutRequest, DeleteAccountRequest,
         DeleteBucketRequest, DeleteFilesInBucketRequest, DownloadBucketRequest,
         DownloadFilesRequest, GetAccountDetailsRequest, GetBucketDetailsRequest,
         GetBucketFilestructureRequest, MoveFilesInBucketRequest, UpdateAccountRequest,
         UpdateBucketRequest, UploadFilesToBucketRequest,
-    },
+    }},
 };
 
 pub struct CreateBucketParams {
@@ -316,6 +316,7 @@ impl TryInto<DeleteFilesInBucketRequest> for DeleteFilesInBucketParams {
     }
 }
 
+#[derive(Clone)]
 pub struct GetFilesystemDetailsParams {
     pub target_bucket_id: uuid::Uuid,
     pub target_bucket_owner_id: Option<uuid::Uuid>,
@@ -365,6 +366,11 @@ impl TryInto<DeleteAccountRequest> for DeleteAccountParams {
     }
 }
 
+pub enum User {
+    UserId(uuid::Uuid),
+    Username(String),
+}
+
 pub struct GetAccountDetailsParams {
     pub target_user_id: Option<User>,
 }
@@ -376,14 +382,17 @@ impl TryInto<GetAccountDetailsRequest> for GetAccountDetailsParams {
 
     fn try_into(self) -> Result<GetAccountDetailsRequest, Self::Error> {
         Ok(GetAccountDetailsRequest {
-            user: self.target_user_id,
+            user: self.target_user_id.map(|x| match x {
+                User::UserId(user_id) => query_client::backend_api::get_account_details_request::User::UserId(user_id.to_string()),
+                User::Username(username) => query_client::backend_api::get_account_details_request::User::Username(username),
+            }),
         })
     }
 }
 
 pub struct CreateCheckoutParams {
-    payment_model: PaymentModel,
-    change_payment_model: bool,
+    pub payment_model: PaymentModel,
+    pub change_payment_model: bool,
 }
 #[derive(thiserror::Error, Debug)]
 pub enum CreateCheckoutParamsParsingError {}

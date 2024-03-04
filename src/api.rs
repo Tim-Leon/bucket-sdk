@@ -1,30 +1,42 @@
 use crate::controller::bucket::bucket::{
-    bucket_download, download_files_from_bucket, upload_files_to_bucket, CreateFileDownloadHandler, DownloadFilesFromBucketError,
+    bucket_download, download_files_from_bucket, upload_files_to_bucket, CreateFileDownloadHandler,
+    DownloadFilesFromBucketError,
 };
 use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
 
 use crate::controller::account::authentication::register;
 use crate::controller::account::errors::RegisterError;
 use crate::controller::bucket::errors::{DownloadError, UploadError};
+use crate::controller::bucket::io::file;
 use crate::controller::bucket::upload_handler::BucketFileReader;
-use crate::dto;
 
-use crate::dto::dto::{CreateBucketParams, CreateBucketParamsParsingError, CreateBucketShareLinkParams, CreateBucketShareLinkParamsParsingError, CreateCheckoutParams, CreateCheckoutParamsParsingError, DeleteAccountParams, DeleteAccountParamsParsingError, DeleteBucketParams, DeleteFilesInBucketParams, DeleteFilesInBucketParamsParsingError, DownloadBucketParams, DownloadBucketParamsParsingError, DownloadFilesParams, DownloadFilesParamsParsingError, GetAccountDetailsParams, GetAccountDetailsParamsParsingError, GetBucketDetailsParams, GetBucketDetailsRequestParsingError, GetFilesystemDetailsParams, GetFilesystemDetailsParamsParsingError, MoveFilesInBucketParams, MoveFilesInBucketRequestParsingError, ParseDeleteBucketRequestError, UpdateAccountParams, UpdateAccountParamsParsingError, UpdateBucketParams, UpdateBucketParamsParsingError, UploadFilesParams, UploadFilesRequestParsingError};
+use crate::dto::dto::{
+    CreateBucketParams, CreateBucketParamsParsingError, CreateBucketShareLinkParams,
+    CreateBucketShareLinkParamsParsingError, CreateCheckoutParams,
+    CreateCheckoutParamsParsingError, DeleteAccountParams, DeleteAccountParamsParsingError,
+    DeleteBucketParams, DeleteFilesInBucketParams, DeleteFilesInBucketParamsParsingError,
+    DownloadBucketParams, DownloadBucketParamsParsingError, DownloadFilesParams,
+    DownloadFilesParamsParsingError, GetAccountDetailsParams, GetAccountDetailsParamsParsingError,
+    GetBucketDetailsParams, GetBucketDetailsRequestParsingError, GetFilesystemDetailsParams,
+    GetFilesystemDetailsParamsParsingError, MoveFilesInBucketParams,
+    MoveFilesInBucketRequestParsingError, ParseDeleteBucketRequestError, UpdateAccountParams,
+    UpdateAccountParamsParsingError, UpdateBucketParams, UpdateBucketParamsParsingError,
+    UploadFilesParams, UploadFilesRequestParsingError,
+};
+use crate::query_client::backend_api::CreateBucketRequest;
+use crate::query_client::backend_api::{
+    CreateBucketResponse, CreateBucketShareLinkRequest, CreateBucketShareLinkResponse,
+    CreateCheckoutRequest, CreateCheckoutResponse, DeleteAccountRequest, DeleteAccountResponse,
+    DeleteBucketRequest, DeleteFilesInBucketRequest, DeleteFilesInBucketResponse,
+    DownloadFilesRequest, GetAccountDetailsRequest, GetAccountDetailsResponse,
+    GetBucketDetailsRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest,
+    GetBucketFilestructureResponse, MoveFilesInBucketRequest, MoveFilesInBucketResponse,
+    UpdateAccountRequest, UpdateAccountResponse,
+};
 use crate::query_client::backend_api::{
     UpdateBucketRequest, UpdateBucketResponse, UploadFilesToBucketRequest,
 };
 use crate::query_client::QueryClient;
-use crate::query_client::backend_api::{
-        CreateBucketResponse, CreateBucketShareLinkRequest,
-        CreateBucketShareLinkResponse, CreateCheckoutRequest, CreateCheckoutResponse,
-        DeleteAccountRequest, DeleteAccountResponse, DeleteBucketRequest,
-        DeleteFilesInBucketRequest, DeleteFilesInBucketResponse, DownloadFilesRequest,
-        GetAccountDetailsRequest, GetAccountDetailsResponse, GetBucketDetailsRequest,
-        GetBucketDetailsResponse, GetBucketFilestructureRequest, GetBucketFilestructureResponse,
-        MoveFilesInBucketRequest, MoveFilesInBucketResponse, UpdateAccountRequest,
-        UpdateAccountResponse,
-    };
-use crate::query_client::backend_api::CreateBucketRequest;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -73,10 +85,15 @@ pub enum BucketApiError {
     #[error(transparent)]
     DownloadFilesFromBucketError(#[from] DownloadFilesFromBucketError),
 
+
     #[error(transparent)]
     DownloadError(#[from] DownloadError),
     #[error(transparent)]
     UploadError(#[from] UploadError),
+
+    // Response parsing error 
+    #[error("GetBucketDetailsRequestFullyResponseParsingError")]
+    GetBucketDetailsRequestFullyResponseParsingError,
 }
 
 impl BucketClient {
@@ -230,7 +247,41 @@ impl BucketClient {
             .unwrap()
             .into_inner())
     }
-
+    /*
+    what if we stop using file structure with subdirectory.
+    and instead uses response message with target directory and store the full filename. Also if filename becomes too long, we just send a token and offset for the next request.
+     */
+    pub async fn get_bucket_filestructure_fully(
+        &mut self,
+        mut param: GetFilesystemDetailsParams,
+    ) -> Result<Vec<crate::query_client::backend_api::File>, BucketApiError> {
+        let mut resulting_files: Vec<crate::query_client::backend_api::File> = Vec::new();
+        loop {
+            let res = self.get_bucket_filestructure(param.clone()).await?;
+            // Append to filesturcture
+            match res.filesystem {
+                Some(filesystem) => {
+                    if filesystem.files.len() <= 0 {
+                        return Err(
+                            BucketApiError::GetBucketDetailsRequestFullyResponseParsingError
+                        );
+                    }
+                    for f in filesystem.files {
+                        resulting_files.push(f);
+                    }
+                }
+                None => {}
+            }
+            if res.continuation_token.is_some() {
+                //param.start_directory = None;
+                param.continuation_token = res.continuation_token;
+            } else {
+                break;
+            }
+        }
+        Ok(resulting_files)
+    }
+    // Prefere using get_bucket_filestructure_fully() when trying to get fullstructure.
     pub async fn get_bucket_filestructure(
         &mut self,
         _param: GetFilesystemDetailsParams,
