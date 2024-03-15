@@ -19,7 +19,7 @@ bucket-common-types = { git = "https://github.com/Tim-Leon/bucket-common-types.g
 zxcvbn = "2.2.2"
 uuid = { version = "1.4.0", features = ["v4", "fast-rng"] }
 url = "2.4.0"
-thiserror = "1.0.57"
+thiserror = "1.0.58"
 bitflags = "2.3.3"
 sha3 = "0.10.8"
 argon2 = "0.5.0"
@@ -38,17 +38,17 @@ tonic = { version = "0.11.0", default-features = false, features = [
 futures = { version = "0.3", default-features = false, features = ["std"] }
 tonic-web-wasm-client = "0.5.1"
 anyhow = "*"
-base64 = "0.21.2"
+base64 = "0.22.0"
 serde = "1.0.175"
-bytemuck = "1.13.1"
+bytemuck = "1.15.0"
 gloo = { version = "0.11.0", features = ["futures", "net", "file", "worker"] }
 zeroize = "1.6.0"
 async-trait = "0.1.72"
 mime = "0.3.17"
-wasm-bindgen = "0.2.87"
+wasm-bindgen = "0.2.92"
 byte-unit = "5.1.4"
 # zip = "0.6.6"
-strum = {version = "0.26.1", features = ["derive"]}
+strum = {version = "0.26.2", features = ["derive"]}
 cookie = { version = "0.18.0", features = ["private"] }
 hex-literal = "0.4.1"
 rust_decimal = "1.33.1"
@@ -56,7 +56,7 @@ pharos = "0.5.3"
 jsonwebtoken = "9.1.0"
 lunchbox = { version = "0.1.3", features = ["full-wasm"] }
 brotli = { version = "3.3.4", features = [] } #"simd"
-web-sys = { version = "0.3.64", features = [
+web-sys = { version = "0.3.69", features = [
     "Document",
     "Window",
     "console",
@@ -73,7 +73,7 @@ time = { version = "0.3.28", features = ["serde", "wasm-bindgen"] }
 passkey = "0.2.0"
 infer = "0.15.0"
 pkg-version = "1.0.0"
-wasm-bindgen-futures = "0.4.38"
+wasm-bindgen-futures = "0.4.42"
 wasm-streams = "0.4.0"
 log = "0.4.20"
 prokio = "0.1.0"
@@ -90,15 +90,15 @@ wasm-bindgen-futures = "0.4"
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # We still need tokio as we have docs linked to it.
 tokio = { version = "1.33", features = ["rt"] }
-tokio-stream = { version = "0.1.14" }
+tokio-stream = { version = "0.1.15" }
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio = { version = "1.33", features = ["full"] }
-tokio-stream = { version = "0.1.14" }
+tokio-stream = { version = "0.1.15" }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.37"
+wasm-bindgen-test = "0.3.42"
 serial_test = "3.0.0"
 criterion = { version = "0.5.1" } # Benchmark framework that is used to deterimne performance change, as in regresion or improvement.
 pretty_assertions = "1.4.0"
