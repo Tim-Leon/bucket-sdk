@@ -16,6 +16,7 @@ use gloo::{console::__macro::JsValue, net::http::Request};
 
 //use tokio_stream::StreamExt;
 
+use crate::api::set_authorization_metadata;
 use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
 use crate::query_client::backend_api::DownloadFilesRequest;
 
@@ -52,10 +53,11 @@ pub struct UploadFileDescriptionState {
 //TODO: Move to params to DTO layer.
 pub async fn upload_files_to_bucket(
     client: &mut QueryClient,
-    req: UploadFilesToBucketRequest,
+    req: tonic::Request<UploadFilesToBucketRequest>,
     mut upload_handler: BucketFileReader,
 ) -> Result<(), UploadError> {
-    let temp_source_files_len = req.source_files.len();
+    
+    let temp_source_files_len = req.get_ref().source_files.len();
 
     let resp = client.upload_files_to_bucket(req).await.unwrap();
     let body = resp.into_inner();
@@ -94,6 +96,7 @@ pub async fn upload_files_to_bucket(
 
 pub async fn download_from_url<DH: BucketFileDownloadHandler + Clone, T>(
     client: &mut QueryClient,
+    api_token: &str, // JWT token 
     url: ExclusiveShareLink,
     hashed_password: Option<String>,
     format: Option<DownloadFormat>,
@@ -148,10 +151,11 @@ pub async fn download_from_url<DH: BucketFileDownloadHandler + Clone, T>(
         hashed_password,
         format: format.map(|x| x.to_string()),
     };
-
+    let mut req = tonic::Request::new(bucket_download_req);
+    set_authorization_metadata(api_token, &mut req);
     bucket_download::<DH, T>(
         client,
-        bucket_download_req,
+        req,
         true,
         create_download_handler,
         additional_param,
@@ -202,7 +206,7 @@ where
 
 pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
     client: &mut QueryClient,
-    req: DownloadFilesRequest,
+    req: tonic::Request<DownloadFilesRequest>,
     // Hook function to provide which file to write to.
     create_file_download_handler_hook: impl CreateFileDownloadHandler<DH, T>,
     jwt_token: String,
@@ -260,7 +264,7 @@ pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
 // TODO: Move to params to DTO
 pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
     client: &mut QueryClient,
-    req: DownloadBucketRequest,
+    req: tonic::Request<DownloadBucketRequest>,
     keep_file_structure: bool, // Will keep the same file structure as on the server. This means directory/directory containing the file
     //download_handler: &mut BucketFileWriter,
     create_download_handler: impl CreateFileDownloadHandler<DH, T>,

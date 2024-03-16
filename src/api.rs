@@ -1,3 +1,6 @@
+use tonic::metadata::{Ascii, Binary, MetadataValue};
+use tonic::Request;
+
 use crate::controller::bucket::bucket::{
     bucket_download, download_files_from_bucket, upload_files_to_bucket, CreateFileDownloadHandler,
     DownloadFilesFromBucketError,
@@ -23,7 +26,7 @@ use crate::dto::dto::{
     UpdateAccountParamsParsingError, UpdateBucketParams, UpdateBucketParamsParsingError,
     UploadFilesParams, UploadFilesRequestParsingError,
 };
-use crate::query_client::backend_api::CreateBucketRequest;
+use crate::query_client::backend_api::{CreateBucketRequest, DownloadBucketRequest};
 use crate::query_client::backend_api::{
     CreateBucketResponse, CreateBucketShareLinkRequest, CreateBucketShareLinkResponse,
     CreateCheckoutRequest, CreateCheckoutResponse, DeleteAccountRequest, DeleteAccountResponse,
@@ -85,15 +88,20 @@ pub enum BucketApiError {
     #[error(transparent)]
     DownloadFilesFromBucketError(#[from] DownloadFilesFromBucketError),
 
-
     #[error(transparent)]
     DownloadError(#[from] DownloadError),
     #[error(transparent)]
     UploadError(#[from] UploadError),
 
-    // Response parsing error 
+    // Response parsing error
     #[error("GetBucketDetailsRequestFullyResponseParsingError")]
     GetBucketDetailsRequestFullyResponseParsingError,
+}
+
+pub fn set_authorization_metadata<T>(api_token:&str, req: &mut Request<T>) {
+    let meta = req.metadata_mut();
+    let meta_data = MetadataValue::<Ascii>::from_str(api_token).unwrap();
+    meta.append("authorization", meta_data);
 }
 
 impl BucketClient {
@@ -115,24 +123,31 @@ impl BucketClient {
 
     pub async fn from_plaintext_credentials(
         api_url: &url::Url,
-        email: &str,
+        email: &email_address::EmailAddress,
         username: &str,
         password: &str,
         captcha: &str,
     ) -> Result<Self, RegisterError> {
         let mut client = QueryClient::build(api_url);
-        let token = register(&mut client, email, username, password, captcha).await?;
+        let token = register(&mut client, email.as_str(), username, password, captcha).await?;
         Ok(Self {
             client: client,
             api_token: token.to_string(),
         })
     }
 
+
+    pub fn set_authorization_metadata<T>(&self, req: &mut Request<T>) {
+        set_authorization_metadata(&self.api_token, req);
+    }
+
     pub async fn create_bucket(
         &mut self,
         _param: CreateBucketParams,
     ) -> Result<CreateBucketResponse, BucketApiError> {
-        let req: CreateBucketRequest = _param.try_into()?;
+        let cbr: CreateBucketRequest = _param.try_into()?;
+        let mut req = Request::new(cbr);
+        self.set_authorization_metadata(&mut req);
         Ok(self.client.create_bucket(req).await.unwrap().into_inner())
     }
 
@@ -140,7 +155,9 @@ impl BucketClient {
         &mut self,
         _param: DeleteBucketParams,
     ) -> Result<crate::query_client::backend_api::DeleteBucketResponse, BucketApiError> {
-        let req: DeleteBucketRequest = _param.try_into()?;
+        let dbr: DeleteBucketRequest = _param.try_into()?;
+        let mut req = Request::new(dbr);
+        self.set_authorization_metadata(&mut req);
         Ok(self.client.delete_bucket(req).await.unwrap().into_inner())
     }
 
@@ -148,7 +165,9 @@ impl BucketClient {
         &mut self,
         _param: UpdateBucketParams,
     ) -> Result<UpdateBucketResponse, BucketApiError> {
-        let req: UpdateBucketRequest = _param.try_into()?;
+        let ubr: UpdateBucketRequest = _param.try_into()?;
+        let mut req = Request::new(ubr);
+        self.set_authorization_metadata(&mut req);
         let resp = self.client.update_bucket(req).await.unwrap().into_inner();
         Ok(resp)
     }
@@ -157,7 +176,9 @@ impl BucketClient {
         &mut self,
         _param: GetBucketDetailsParams,
     ) -> Result<GetBucketDetailsResponse, BucketApiError> {
-        let req: GetBucketDetailsRequest = _param.try_into()?;
+        let gbdr: GetBucketDetailsRequest = _param.try_into()?;
+        let mut req = Request::new(gbdr);
+        self.set_authorization_metadata(&mut req);
         Ok(self
             .client
             .get_bucket_details(req)
@@ -170,7 +191,9 @@ impl BucketClient {
         param: UploadFilesParams,
         upload_file_handler: BucketFileReader,
     ) -> Result<(), BucketApiError> {
-        let req: UploadFilesToBucketRequest = param.try_into()?;
+        let uftbr: UploadFilesToBucketRequest = param.try_into()?;
+        let mut req = Request::new(uftbr);
+        self.set_authorization_metadata(&mut req);
         upload_files_to_bucket(&mut self.client, req, upload_file_handler).await?;
         Ok(())
     }
@@ -187,7 +210,9 @@ impl BucketClient {
         keep_file_structure: bool,
         additional_param: Rc<T>,
     ) -> Result<(), BucketApiError> {
-        let req: DownloadFilesRequest = _param.try_into()?;
+        let dfr: DownloadFilesRequest = _param.try_into()?;
+        let mut req = Request::new(dfr);
+        self.set_authorization_metadata(&mut req);
         download_files_from_bucket::<DH, T>(
             &mut self.client,
             req,
@@ -207,7 +232,9 @@ impl BucketClient {
         additional_param: Rc<T>,
     ) -> Result<Vec<String>, BucketApiError> {
         let keep_file_structure = param.keep_file_structure;
-        let req = param.try_into()?;
+        let dbr: DownloadBucketRequest = param.try_into()?;
+        let mut req = Request::new(dbr);
+        self.set_authorization_metadata(&mut req);
 
         let res = bucket_download::<DH, T>(
             &mut self.client,
@@ -226,7 +253,9 @@ impl BucketClient {
         &mut self,
         _param: MoveFilesInBucketParams,
     ) -> Result<MoveFilesInBucketResponse, BucketApiError> {
-        let req: MoveFilesInBucketRequest = _param.try_into()?;
+        let mfibr: MoveFilesInBucketRequest = _param.try_into()?;
+        let mut req = Request::new(mfibr);
+        self.set_authorization_metadata(&mut req);
         Ok(self
             .client
             .move_files_in_bucket(req)
@@ -239,7 +268,9 @@ impl BucketClient {
         &mut self,
         _param: DeleteFilesInBucketParams,
     ) -> Result<DeleteFilesInBucketResponse, BucketApiError> {
-        let req: DeleteFilesInBucketRequest = _param.try_into()?;
+        let dfibr: DeleteFilesInBucketRequest = _param.try_into()?;
+        let mut req = Request::new(dfibr);
+        self.set_authorization_metadata(&mut req);
         Ok(self
             .client
             .delete_files_in_bucket(req)
@@ -263,7 +294,7 @@ impl BucketClient {
                 Some(filesystem) => {
                     if filesystem.files.len() <= 0 {
                         return Err(
-                            BucketApiError::GetBucketDetailsRequestFullyResponseParsingError
+                            BucketApiError::GetBucketDetailsRequestFullyResponseParsingError,
                         );
                     }
                     for f in filesystem.files {
@@ -286,7 +317,9 @@ impl BucketClient {
         &mut self,
         _param: GetFilesystemDetailsParams,
     ) -> Result<GetBucketFilestructureResponse, BucketApiError> {
-        let req: GetBucketFilestructureRequest = _param.try_into()?;
+        let gbfs: GetBucketFilestructureRequest = _param.try_into()?;
+        let mut req = Request::new(gbfs);
+        self.set_authorization_metadata(&mut req);
         Ok(self
             .client
             .get_bucket_filestructure(req)
@@ -299,7 +332,9 @@ impl BucketClient {
         &mut self,
         _param: UpdateAccountParams,
     ) -> Result<UpdateAccountResponse, BucketApiError> {
-        let req: UpdateAccountRequest = _param.try_into()?;
+        let ua: UpdateAccountRequest = _param.try_into()?;
+        let mut req = Request::new(ua);
+        self.set_authorization_metadata(&mut req);
         Ok(self.client.update_account(req).await.unwrap().into_inner())
     }
 
@@ -307,7 +342,9 @@ impl BucketClient {
         &mut self,
         _param: DeleteAccountParams,
     ) -> Result<DeleteAccountResponse, BucketApiError> {
-        let req: DeleteAccountRequest = _param.try_into()?;
+        let dar: DeleteAccountRequest = _param.try_into()?;
+        let mut req = Request::new(dar);
+        self.set_authorization_metadata(&mut req);
         Ok(self.client.delete_account(req).await.unwrap().into_inner())
     }
 
@@ -315,7 +352,9 @@ impl BucketClient {
         &mut self,
         _param: GetAccountDetailsParams,
     ) -> Result<GetAccountDetailsResponse, BucketApiError> {
-        let req: GetAccountDetailsRequest = _param.try_into()?;
+        let gadr: GetAccountDetailsRequest = _param.try_into()?;
+        let mut req = Request::new(gadr);
+        self.set_authorization_metadata(&mut req);
         Ok(self
             .client
             .get_account_details(req)
@@ -328,7 +367,9 @@ impl BucketClient {
         &mut self,
         _param: CreateCheckoutParams,
     ) -> Result<CreateCheckoutResponse, BucketApiError> {
-        let req: CreateCheckoutRequest = _param.try_into()?;
+        let ccr: CreateCheckoutRequest = _param.try_into()?;
+        let mut req = Request::new(ccr);
+        self.set_authorization_metadata(&mut req);
         Ok(self.client.create_checkout(req).await.unwrap().into_inner())
     }
 
@@ -336,7 +377,9 @@ impl BucketClient {
         &mut self,
         _param: CreateBucketShareLinkParams,
     ) -> Result<CreateBucketShareLinkResponse, BucketApiError> {
-        let req: CreateBucketShareLinkRequest = _param.try_into()?;
+        let cbslr: CreateBucketShareLinkRequest = _param.try_into()?;
+        let mut req = Request::new(cbslr);
+        self.set_authorization_metadata(&mut req);
         Ok(self
             .client
             .create_bucket_share_link(req)
