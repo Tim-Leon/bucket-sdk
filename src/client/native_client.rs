@@ -12,8 +12,8 @@ pub mod query_client {
     pub type QueryClient = BackendApiClient<Channel>;
 
     impl QueryClient {
-        pub async fn build(api_url: &url::Url) -> BackendApiClient<Channel> {
-            let url = Uri::from_str(api_url.as_str()).unwrap();
+        pub async fn build(api_url: &str) -> BackendApiClient<Channel> {
+            let url = Uri::from_str(api_url).unwrap();
             let client = tonic::transport::Channel::builder(url).connect().await.unwrap();
             BackendApiClient::new(client)
         }
@@ -23,7 +23,7 @@ pub mod query_client {
          */
         pub async fn build_from_env() -> BackendApiClient<Channel> {
             let base_url = std::env::var("API_URL").expect("API_URL must be set");
-            Self::build(&url::Url::parse(&base_url).expect("API_URL must be a valid URL")).await
+            Self::build(&base_url).await
         }
     }
 }

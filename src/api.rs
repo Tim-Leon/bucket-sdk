@@ -106,7 +106,7 @@ pub fn set_authorization_metadata<T>(api_token:&str, req: &mut Request<T>) {
 }
 
 impl BucketClient {
-    pub async fn new(api_url: &url::Url, api_token: &str) -> Self {
+    pub async fn new(api_url: &str, api_token: &str) -> Self {
         let client = QueryClient::build(api_url).await;
         BucketClient {
             client,
@@ -117,13 +117,13 @@ impl BucketClient {
     /// API_URL
     /// API_TOKEN
     pub async fn from_env() -> Self {
-        let api_url = url::Url::from_str(std::env::var("API_URL").unwrap().as_str()).unwrap();
+        let api_url = std::env::var("API_URL").unwrap();
         let api_token = std::env::var("API_TOKEN").unwrap();
         Self::new(&api_url, &api_token).await
     }
 
     pub async fn from_plaintext_credentials(
-        api_url: &url::Url,
+        api_url: &str,
         email: &email_address::EmailAddress,
         username: &str,
         password: &str,
