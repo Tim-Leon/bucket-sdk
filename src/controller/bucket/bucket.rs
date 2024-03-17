@@ -18,9 +18,8 @@ use gloo::{console::__macro::JsValue, net::http::Request};
 
 use crate::api::set_authorization_metadata;
 use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
-use crate::query_client::backend_api::DownloadFilesRequest;
-
-use crate::query_client::{
+use crate::client::query_client::backend_api::DownloadFilesRequest;
+use crate::client::query_client::{
     backend_api::{
         self, DeleteFilesInBucketRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest,
         MoveFilesInBucketRequest, UploadFilesToBucketRequest,
@@ -36,7 +35,7 @@ use crate::controller::bucket::errors::{
 
 use crate::controller::bucket::upload_handler::BucketFileReader;
 use crate::controller::bucket::upload_handler::BucketFileUploadHandler;
-use crate::query_client::backend_api::{
+use crate::client::query_client::backend_api::{
     GetBucketDetailsFromUrlRequest, GetBucketDetailsFromUrlResponse,
 };
 

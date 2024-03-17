@@ -1,6 +1,8 @@
 use tonic::metadata::{Ascii, Binary, MetadataValue};
 use tonic::Request;
 
+use crate::client;
+use crate::client::query_client::backend_api;
 use crate::controller::bucket::bucket::{
     bucket_download, download_files_from_bucket, upload_files_to_bucket, CreateFileDownloadHandler,
     DownloadFilesFromBucketError,
@@ -10,7 +12,6 @@ use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
 use crate::controller::account::authentication::register;
 use crate::controller::account::errors::RegisterError;
 use crate::controller::bucket::errors::{DownloadError, UploadError};
-use crate::controller::bucket::io::file;
 use crate::controller::bucket::upload_handler::BucketFileReader;
 
 use crate::dto::dto::{
@@ -26,8 +27,8 @@ use crate::dto::dto::{
     UpdateAccountParamsParsingError, UpdateBucketParams, UpdateBucketParamsParsingError,
     UploadFilesParams, UploadFilesRequestParsingError,
 };
-use crate::query_client::backend_api::{CreateBucketRequest, DownloadBucketRequest};
-use crate::query_client::backend_api::{
+use client::query_client::backend_api::{CreateBucketRequest, DownloadBucketRequest};
+use client::query_client::backend_api::{
     CreateBucketResponse, CreateBucketShareLinkRequest, CreateBucketShareLinkResponse,
     CreateCheckoutRequest, CreateCheckoutResponse, DeleteAccountRequest, DeleteAccountResponse,
     DeleteBucketRequest, DeleteFilesInBucketRequest, DeleteFilesInBucketResponse,
@@ -36,10 +37,10 @@ use crate::query_client::backend_api::{
     GetBucketFilestructureResponse, MoveFilesInBucketRequest, MoveFilesInBucketResponse,
     UpdateAccountRequest, UpdateAccountResponse,
 };
-use crate::query_client::backend_api::{
+use client::query_client::backend_api::{
     UpdateBucketRequest, UpdateBucketResponse, UploadFilesToBucketRequest,
 };
-use crate::query_client::QueryClient;
+use client::query_client::QueryClient;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -105,8 +106,8 @@ pub fn set_authorization_metadata<T>(api_token:&str, req: &mut Request<T>) {
 }
 
 impl BucketClient {
-    pub fn new(api_url: &url::Url, api_token: &str) -> Self {
-        let client = QueryClient::build(api_url);
+    pub async fn new(api_url: &url::Url, api_token: &str) -> Self {
+        let client = QueryClient::build(api_url).await;
         BucketClient {
             client,
             api_token: api_token.to_string(),
@@ -115,10 +116,10 @@ impl BucketClient {
     /// Uses enviorment variables:
     /// API_URL
     /// API_TOKEN
-    pub fn from_env() -> Self {
+    pub async fn from_env() -> Self {
         let api_url = url::Url::from_str(std::env::var("API_URL").unwrap().as_str()).unwrap();
         let api_token = std::env::var("API_TOKEN").unwrap();
-        Self::new(&api_url, &api_token)
+        Self::new(&api_url, &api_token).await
     }
 
     pub async fn from_plaintext_credentials(
@@ -128,7 +129,7 @@ impl BucketClient {
         password: &str,
         captcha: &str,
     ) -> Result<Self, RegisterError> {
-        let mut client = QueryClient::build(api_url);
+        let mut client = QueryClient::build(api_url).await;
         let token = register(&mut client, email.as_str(), username, password, captcha).await?;
         Ok(Self {
             client: client,
@@ -154,7 +155,7 @@ impl BucketClient {
     pub async fn delete_bucket(
         &mut self,
         _param: DeleteBucketParams,
-    ) -> Result<crate::query_client::backend_api::DeleteBucketResponse, BucketApiError> {
+    ) -> Result<backend_api::DeleteBucketResponse, BucketApiError> {
         let dbr: DeleteBucketRequest = _param.try_into()?;
         let mut req = Request::new(dbr);
         self.set_authorization_metadata(&mut req);
@@ -285,8 +286,8 @@ impl BucketClient {
     pub async fn get_bucket_filestructure_fully(
         &mut self,
         mut param: GetFilesystemDetailsParams,
-    ) -> Result<Vec<crate::query_client::backend_api::File>, BucketApiError> {
-        let mut resulting_files: Vec<crate::query_client::backend_api::File> = Vec::new();
+    ) -> Result<Vec<backend_api::File>, BucketApiError> {
+        let mut resulting_files: Vec<backend_api::File> = Vec::new();
         loop {
             let res = self.get_bucket_filestructure(param.clone()).await?;
             // Append to filesturcture

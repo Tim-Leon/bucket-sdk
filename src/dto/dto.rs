@@ -4,21 +4,14 @@ use bucket_common_types::{
 };
 
 use crate::{
-    controller::bucket::{
+    client::query_client::backend_api::{self, CreateBucketShareLinkRequest}, controller::bucket::{
         bucket::DownloadFilesFromBucketError,
         errors::{DownloadError, UploadError},
         io::file::{BucketFile, BucketFileTrait, VirtualFileDetails},
-    },
-    query_client::{self, backend_api::{
-        download_files_request::File, CreateBucketRequest,
-        CreateBucketShareLinkRequest, CreateCheckoutRequest, DeleteAccountRequest,
-        DeleteBucketRequest, DeleteFilesInBucketRequest, DownloadBucketRequest,
-        DownloadFilesRequest, GetAccountDetailsRequest, GetBucketDetailsRequest,
-        GetBucketFilestructureRequest, MoveFilesInBucketRequest, UpdateAccountRequest,
-        UpdateBucketRequest, UploadFilesToBucketRequest,
-    }},
+    }
 };
 
+use crate::client::query_client::backend_api::*;
 pub struct CreateBucketParams {
     pub target_user_id: uuid::Uuid,
     //  pub target_bucket_id: uuid::Uuid,
@@ -195,8 +188,8 @@ impl TryInto<UploadFilesToBucketRequest> for UploadFilesParams {
             target_bucket_id: self.target_bucket_id.to_string(),
             target_bucket_owner_id: self.target_user_id.to_string(),
             target_directory: self.target_directory,
-            source_files: self.source_files.iter().fold(Vec::<crate::query_client::backend_api::upload_files_to_bucket_request::File>::with_capacity(self.source_files.len()), |mut acc, num| {
-                acc.push(crate::query_client::backend_api::upload_files_to_bucket_request::File {
+            source_files: self.source_files.iter().fold(Vec::<backend_api::upload_files_to_bucket_request::File>::with_capacity(self.source_files.len()), |mut acc, num| {
+                acc.push(backend_api::upload_files_to_bucket_request::File {
                     file_path: num.target_directory.clone(),
                     size_in_bytes: num.source_file.get_size(),
                     content_type:  num.source_file.get_mime_type().unwrap().to_string(),
@@ -228,9 +221,9 @@ impl TryInto<DownloadFilesRequest> for DownloadFilesParams {
             bucket_id: self.target_bucket_id.to_string(),
             bucket_owner_id: self.target_user_id.to_string(),
             files: self.files.iter().fold(
-                Vec::<File>::with_capacity(self.files.len()),
+                Vec::<download_files_request::File>::with_capacity(self.files.len()),
                 |mut acc, val| {
-                    acc.push(File {
+                    acc.push(download_files_request::File {
                         file_path: val.path.clone(),
                         size_in_bytes: val.size_in_bytes,
                     }); //TODO: fix
@@ -381,8 +374,8 @@ impl TryInto<GetAccountDetailsRequest> for GetAccountDetailsParams {
     fn try_into(self) -> Result<GetAccountDetailsRequest, Self::Error> {
         Ok(GetAccountDetailsRequest {
             user: self.target_user_id.map(|x| match x {
-                User::UserId(user_id) => query_client::backend_api::get_account_details_request::User::UserId(user_id.to_string()),
-                User::Username(username) => query_client::backend_api::get_account_details_request::User::Username(username),
+                User::UserId(user_id) => backend_api::get_account_details_request::User::UserId(user_id.to_string()),
+                User::Username(username) => backend_api::get_account_details_request::User::Username(username),
             }),
         })
     }

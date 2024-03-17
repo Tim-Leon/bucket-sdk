@@ -1,4 +1,4 @@
-use crate::query_client::{
+use crate::client::query_client::{
     backend_api::{
         get_account_details_request::User, DeleteAccountRequest, DeleteAccountResponse,
         GetAccountDetailsRequest, GetAccountDetailsResponse, UpdateAccountRequest,
