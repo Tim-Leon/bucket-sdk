@@ -40,7 +40,7 @@ serde = "1.0.175"
 bytemuck = "1.13.1"
 gloo = { version = "0.11.0", features = ["futures", "net", "file", "worker"] }
 zeroize = "1.6.0"
-async-trait = "0.1.72"
+async-trait = "0.1.78"
 mime = "0.3.17"
 byte-unit = "5.1.4"
 # zip = "0.6.6"
