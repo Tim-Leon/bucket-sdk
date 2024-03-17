@@ -101,7 +101,9 @@ pub enum BucketApiError {
 
 pub fn set_authorization_metadata<T>(api_token:&str, req: &mut Request<T>) {
     let meta = req.metadata_mut();
-    let meta_data = MetadataValue::<Ascii>::from_str(api_token).unwrap();
+    let mut token: String = "Bearer ".to_string();
+    token.push_str(api_token);
+    let meta_data = MetadataValue::<Ascii>::from_str(token.as_str()).unwrap();
     meta.append("authorization", meta_data);
 }
 
