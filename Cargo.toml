@@ -17,10 +17,10 @@ bucket-common-types = { git = "https://github.com/Tim-Leon/bucket-common-types.g
     "share_link",
 ] }
 zxcvbn = "2.2.2"
-uuid = { version = "1.4.0", features = ["v4", "fast-rng"] }
+uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
 url = "2.4.0"
 thiserror = "1.0.57"
-bitflags = "2.3.3"
+bitflags = "2.5.0"
 sha3 = "0.10.8"
 argon2 = "0.5.0"
 highway = "1.1.0"
@@ -40,7 +40,7 @@ serde = "1.0.175"
 bytemuck = "1.13.1"
 gloo = { version = "0.11.0", features = ["futures", "net", "file", "worker"] }
 zeroize = "1.6.0"
-async-trait = "0.1.72"
+async-trait = "0.1.78"
 mime = "0.3.17"
 byte-unit = "5.1.4"
 # zip = "0.6.6"
@@ -49,9 +49,9 @@ cookie = { version = "0.18.0", features = ["private"] }
 hex-literal = "0.4.1"
 rust_decimal = "1.33.1"
 pharos = "0.5.3"
-jsonwebtoken = "9.1.0"
+jsonwebtoken = "9.3.0"
 lunchbox = { version = "0.1.3", features = ["full-wasm"] }
-brotli = { version = "3.3.4", features = [] } #"simd"
+brotli = { version = "3.5.0", features = [] } #"simd"
 
 time = { version = "0.3.28", features = ["serde", "wasm-bindgen"] }
 passkey = "0.2.0"
