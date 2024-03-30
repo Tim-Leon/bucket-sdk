@@ -27,10 +27,10 @@ bucket-common-types = { git = "https://github.com/Tim-Leon/bucket-common-types.g
     "share_link",
 ] }
 zxcvbn = "2.2.2"
-uuid = { version = "1.4.0", features = ["v4", "fast-rng"] }
+uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
 url = "2.4.0"
 thiserror = "1.0.57"
-bitflags = "2.3.3"
+bitflags = "2.5.0"
 sha3 = "0.10.8"
 argon2 = "0.5.0"
 highway = "1.1.0"
@@ -50,18 +50,18 @@ serde = "1.0.175"
 bytemuck = "1.13.1"
 gloo = { version = "0.11.0", features = ["futures", "net", "file", "worker"] }
 zeroize = "1.6.0"
-async-trait = "0.1.72"
+async-trait = "0.1.79"
 mime = "0.3.17"
 byte-unit = "5.1.4"
 # zip = "0.6.6"
 strum = {version = "0.26.1", features = ["derive"]}
-cookie = { version = "0.18.0", features = ["private"] }
+cookie = { version = "0.18.1", features = ["private"] }
 hex-literal = "0.4.1"
-rust_decimal = "1.33.1"
+rust_decimal = "1.35.0"
 pharos = "0.5.3"
-jsonwebtoken = "9.1.0"
+jsonwebtoken = "9.3.0"
 lunchbox = { version = "0.1.3", features = ["full-wasm"] }
-brotli = { version = "3.3.4", features = [] } #"simd"
+brotli = { version = "3.5.0", features = [] } #"simd"
 
 time = { version = "0.3.28", features = ["serde", "wasm-bindgen"] }
 passkey = "0.2.0"
@@ -104,7 +104,7 @@ tonic = { version = "0.11.0", default-features = false, features = [
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # We still need tokio as we have docs linked to it.
-tokio = { version = "1.33", features = ["rt"] }
+tokio = { version = "1.37", features = ["rt"] }
 tokio-stream = { version = "0.1.14" }
 tonic = { version = "0.11.0", default-features = false, features = [
     "prost",
@@ -113,7 +113,7 @@ tonic = { version = "0.11.0", default-features = false, features = [
 ] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-tokio = { version = "1.33", features = ["full"] }
+tokio = { version = "1.37", features = ["full"] }
 tokio-stream = { version = "0.1.14" }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
