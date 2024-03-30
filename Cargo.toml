@@ -5,12 +5,22 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
+default = ["web"]
 s3 = []
 proto = []
 wasm = []
+# Stream API compatibility, mpeg-dash video stream support
+stream = []
+# Listen changes in the Storage, synchronization API support. for listening and parsing webhook events.
+sync = []
+# Compress files before transit. 
+compression = []
+# 
+
 web = ["wasm", "proto"]
 cli = ["proto", "s3", "native"]
 native = [] #"dep:tokio", "dep:tokio-stream"
+
 [dependencies]
 bucket-common-types = { git = "https://github.com/Tim-Leon/bucket-common-types.git", features = [
     "secret_share_link",
@@ -60,6 +70,8 @@ pkg-version = "1.0.0"
 log = "0.4.20"
 prokio = "0.1.0"
 email_address = "0.2.4"
+mnemonic = "1.1.1"
+dash-mpd = {version = "0.15.0", features = ["tokio"],optional = true}
 
 [target.'cfg(unix)'.dependencies]
 fuser = "0.14.0" # https://crates.io/crates/fuser

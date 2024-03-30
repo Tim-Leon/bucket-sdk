@@ -21,3 +21,5 @@ pub const HIGHWAY_HASH_KEY: [u64; 4] = [
 ];
 
 pub const V1_ENCRYPTION_PASSWORD_SALT: &str = "";
+
+pub const V1_X25519_SIGNATURE_HASH_SALT:&str = "";

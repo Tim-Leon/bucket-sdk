@@ -38,7 +38,7 @@ pub trait BucketFileUploadHandler {
     // Called when a chunk is uploaded. returns the chunk to be uploaded. It's up to the implementation to encrypt the chunk if the bucket is encrypted.
     async fn on_upload_chunk(&mut self, chunk_size: u64) -> Result<Vec<u8>, Self::Error>;
     // Called when the last chunk has been uploaded. In this method the user is still able to upload data, if so it will return a Vec.
-    fn on_upload_finish(self) -> Result<Option<Vec<u8>>, Self::Error>;
+    fn on_upload_finish(self) -> Result<(), Self::Error>;
 }
 
 #[async_trait(?Send)]
@@ -56,7 +56,8 @@ impl BucketFileUploadHandler for BucketFileReader {
     ) -> Result<u64, Self::Error> {
         match bucket_encryption {
             Some(_bucket_encryption) => match &self.encryption_module {
-                Some(_encryption_module) => {}
+                Some(_encryption_module) => {
+                }
                 None => {
                     return Err(BucketDownloadHandlerFileErrors::EncryptionModuleNotInitialized);
                 }
@@ -76,18 +77,18 @@ impl BucketFileUploadHandler for BucketFileReader {
 
         match &mut self.encryption_module {
             Some(x) => {
-                let decrypted_bytes = x.update(bytes)?;
-                Ok(decrypted_bytes)
+                let encrypted_bytes = x.update(bytes)?;
+                Ok(encrypted_bytes)
             }
             None => Ok(bytes),
         }
     }
 
-    fn on_upload_finish(self) -> Result<Option<Vec<u8>>, Self::Error> {
-        let signed_hash: Option<Vec<u8>> = match self.encryption_module {
-            Some(x) => Some(x.finalize()?),
+    fn on_upload_finish(self) -> Result<(), Self::Error> {
+        let signed_hash = match self.encryption_module {
+            Some(x) => Some(x.finalize()),
             None => return Err(Self::Error::EncryptionModuleNotInitialized),
         };
-        Ok(signed_hash)
+        Ok(())
     }
 }

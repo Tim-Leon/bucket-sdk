@@ -9,30 +9,28 @@ use highway::HighwayHash;
 use crate::encryption_v1::constants::{
     AES_GCM_NONCE, HIGHWAY_HASH_KEY, SHARE_LINK_SIGNATURE_NOISE,
 };
-use crate::encryption_v1::encryption::{generate_bucket_encryption_key, ClientSecrets};
+use crate::encryption_v1::encryption::{generate_bucket_encryption_key, MasterKey};
+
+use super::hash_based_signature::Ed25519HighwayHashBasedSignature;
 
 pub trait DecryptionModule {
     type Error;
     /// Returns vector of decrypted data
     fn update(&mut self, ciphertext: impl AsRef<[u8]>) -> Result<Vec<u8>, Self::Error>;
-    /// Finalize decryption by returning Vector which could contain hash/signature, get creative.
-    fn finalize(self) -> Result<(), Self::Error>;
+    fn finalize(self);
 }
 #[derive(Clone)]
 pub struct ZeroKnowledgeDecryptionModuleV1 {
-    secrets: Arc<ClientSecrets>,
+    secrets: Arc<MasterKey>,
     bucket_symmetric_encryption_key: aes_gcm::Aes256Gcm,
-    hasher: highway::HighwayHasher,
     nonce: Nonce<typenum::U12>,
-    ed25519_noise: Noise,
-    signature: Option<Signature>,
+    hash_based_signature: Option<Ed25519HighwayHashBasedSignature>,
 }
 
 impl ZeroKnowledgeDecryptionModuleV1 {
     pub fn new(
-        secrets: Arc<ClientSecrets>,
+        secrets: Arc<MasterKey>,
         bucket_id: &uuid::Uuid,
-        signature: Option<Signature>,
     ) -> Self {
         Self {
             secrets: secrets.clone(),
@@ -41,10 +39,8 @@ impl ZeroKnowledgeDecryptionModuleV1 {
                 bucket_id,
             )
             .unwrap(),
-            hasher: highway::HighwayHasher::new(highway::Key(HIGHWAY_HASH_KEY)),
             nonce: *Nonce::from_slice(&AES_GCM_NONCE), //TODO: NONCE should come from the bucket name?
-            ed25519_noise: Noise::from_slice(&SHARE_LINK_SIGNATURE_NOISE).unwrap(),
-            signature,
+            hash_based_signature: None
         }
     }
 }
@@ -60,26 +56,15 @@ pub enum DecryptionError {
 impl DecryptionModule for ZeroKnowledgeDecryptionModuleV1 {
     type Error = DecryptionError;
     fn update(&mut self, ciphertext: impl AsRef<[u8]>) -> Result<Vec<u8>, Self::Error> {
-        self.hasher.append(ciphertext.as_ref());
         let plaintext = self
             .bucket_symmetric_encryption_key
             .decrypt(&self.nonce, ciphertext.as_ref())
             .map_err(DecryptionError::FailedToDecryptChunk)?;
         Ok(plaintext)
     }
-
-    fn finalize(self) -> Result<(), Self::Error> {
-        let hash_result = self.hasher.finalize256();
-        match self.signature {
-            None => {}
-            Some(signature) => {
-                self.secrets
-                    .ed25519_keypair
-                    .pk
-                    .verify(bytemuck::bytes_of(&hash_result), &signature)
-                    .map_err(DecryptionError::InvalidSignature)?;
-            }
-        }
-        Ok(())
+    
+    fn finalize(self) {
+        
     }
+
 }

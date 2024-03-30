@@ -3,6 +3,7 @@ use aes_gcm::{
     aead::{generic_array::typenum, Aead},
     KeyInit, Nonce,
 };
+use argon2::password_hash::SaltString;
 
 use std::sync::Arc;
 //use sha2::Sha512;
@@ -13,8 +14,10 @@ use crate::encryption_v1::hash::{
 
 use highway::HighwayHash;
 
-use sha3::{digest::InvalidLength, Digest};
+use sha3::{digest::InvalidLength, Digest, Sha3_256};
 use std::str;
+
+use super::constants::V1_X25519_SIGNATURE_HASH_SALT;
 // struct DefaultCipherSuite;
 // impl CipherSuite for DefaultCipherSuite {
 //     type OprfCs = opaque_ke::Ristretto255;
@@ -76,104 +79,46 @@ pub enum EncryptionSetupError {
 * TODO: Fuzz input
 * MUST BE DETERMINISTIC
 */
-pub fn setup(password: &str, email: &str) -> Result<ClientSecrets, EncryptionSetupError> {
-    let master_key = argon2id_hash_password(password, email, V1_ENCRYPTION_PASSWORD_SALT)?;
-    let seed = ed25519_compact::Seed::from_slice(master_key[0..32].as_bytes()).unwrap();
-    let ed25519_keypair = ed25519_compact::KeyPair::from_seed(seed); //from_slice(master_key.as_bytes().take).unwrap();
-    Ok(ClientSecrets {
-        master_key,
-        ed25519_keypair,
+pub fn setup(password: &str, email: &str) -> Result<MasterKey, EncryptionSetupError> {
+    let salt = SaltString::from_b64(&V1_ENCRYPTION_PASSWORD_SALT).map_err(PasswordHashErrors::PasswordHashError)?;
+    let master_key = argon2id_hash_password(password, email, salt.as_salt())?
+        .hash
+        .unwrap();
+    Ok(MasterKey {
+        0: master_key.to_string(),
     })
 }
 
+
+
+pub fn create_ed25519_signing_keys(master_key: &MasterKey) -> Result<ed25519_compact::KeyPair, ed25519_compact::Error>{
+    let mut hasher = Sha3_256::new(); 
+    hasher.update(master_key.0.as_bytes());
+    hasher.update(V1_X25519_SIGNATURE_HASH_SALT);
+    let slice = hasher.finalize();
+    let seed = ed25519_compact::Seed::from_slice(&slice).unwrap(); //[0..32]
+    let ed25519_key_pair = ed25519_compact::KeyPair::from_seed(seed); 
+    Ok(ed25519_key_pair)
+}
+
 pub fn generate_bucket_encryption_key(
-    secrets: Arc<ClientSecrets>,
+    master_key: Arc<MasterKey>,
     bucket_id: &uuid::Uuid,
 ) -> Result<aes_gcm::Aes256Gcm, InvalidLength> {
-    let bucket_key = bucket_key_hash_sha256(secrets.master_key.clone(), bucket_id);
+    let bucket_key = bucket_key_hash_sha256(&master_key, bucket_id);
     //let aes_gcm_key = aes_gcm::Key::<aes_gcm::Aes256Gcm>::from_slice(bucket_key.as_slice());
     let aes_gcm_key = aes_gcm::Aes256Gcm::new_from_slice(bucket_key.as_slice());
     aes_gcm_key
 }
+#[derive(zeroize::Zeroize)]
+pub struct Secrets {
+    pub master_key: MasterKey,
+    pub signing_key: ed25519_compact::KeyPair,
+}
 
 #[derive(zeroize::Zeroize, Clone)]
-pub struct ClientSecrets {
-    master_key: String,
-    pub ed25519_keypair: ed25519_compact::KeyPair,
-}
+pub struct MasterKey (pub String);
 
-impl ClientSecrets {
-    pub fn get_ed25519_public_signing_key(&self) -> ed25519_compact::PublicKey {
-        self.ed25519_keypair.pk
-    }
-}
-
-/*
-Use the aes_gcm symetric key to encrypt the file content.
-Use HighwayHash to hash the encrypted file content.
-Use the ed25519 keypair to sign the hash.
-*/
-pub async fn encrypted_upload_files(
-    aes_gcm_symmetric_key: &aes_gcm::Key<aes_gcm::Aes256Gcm>,
-    ed25519_signing_key: &ed25519_compact::KeyPair,
-    file: gloo::file::File,
-    upload_fn: fn(&[u8]),
-    upload_finish: fn(&[u8]),
-) {
-    let key = highway::Key([1, 2, 3, 4]);
-    let mut highway_hash = highway::HighwayHasher::new(key);
-    let filename = file.name();
-    let aes_gcm_cipher = aes_gcm::Aes256Gcm::new_from_slice(aes_gcm_symmetric_key).unwrap();
-    let nonce = aes_gcm::Nonce::from_slice(filename.as_bytes()); //TODO: Fix
-                                                                 //let mut file_bytes = file.bytes();
-                                                                 //file.read_to_end(&mut file_bytes);
-                                                                 //TODO: Chunk it. Read 1MB at a time.
-                                                                 //let file_reader = gloo::file::futures::read_as_array_bytes(&file, read_fn);
-    let file_size = file.size();
-    // Iterate over the file in 1MB chunks,
-    // encrypt each chunk while also hashing it.
-    // Then upload the encrypted chunk.
-    // After the file is uploaded, sign the hash, upload the hash signature.
-    // Done!
-    for _it in 0..&file_size / 1024 {
-        let chunk_data = gloo::file::futures::read_as_bytes(&file).await.unwrap(); //TODO: What if file is too big for memory?
-        let ciphertext = aes_gcm_cipher
-            .encrypt(nonce, chunk_data.as_slice())
-            .unwrap();
-        highway_hash.append(&ciphertext);
-        upload_fn(&ciphertext);
-    }
-    let hash = highway_hash.finalize256();
-    let signature = ed25519_signing_key.sk.sign(bytemuck::bytes_of(&hash), None);
-    // Upload
-    upload_finish(signature.as_slice());
-}
-
-pub async fn encrypt_chunk(
-    aes_gcm_symmetric_key: &aes_gcm::Key<aes_gcm::Aes256Gcm>,
-    nonce: &Nonce<typenum::U12>,
-    _ed25519_signing_key: &ed25519_compact::KeyPair,
-    highway_hash: &mut highway::HighwayHasher,
-    chunk_data: Vec<u8>,
-) -> Vec<u8> {
-    let aes_gcm_cipher = aes_gcm::Aes256Gcm::new(aes_gcm_symmetric_key);
-    let ciphertext = aes_gcm_cipher
-        .encrypt(nonce, chunk_data.as_slice())
-        .unwrap();
-    highway_hash.append(&ciphertext);
-    ciphertext
-}
-
-// pub async fn encrypt_finalize(
-//     ed25519_signing_key: &ed25519_compact::KeyPair,
-//     highway_hash: &mut highway::HighwayHasher,
-// ) -> Signature {
-//     let hash = highway_hash.finalize256();
-//     let signature = ed25519_signing_key.sk.sign(&bytemuck::bytes_of(&hash), None);
-//     signature
-// }
-
-//pub fn generate_rsa_keypair()
 
 #[cfg(test)]
 mod tests {

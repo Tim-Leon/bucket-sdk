@@ -3,6 +3,8 @@ pub mod decryption_module;
 pub mod encryption;
 pub mod encryption_module;
 pub mod hash;
+pub mod hash_based_signature;
+mod hash_based_signature_verifier;
 
 #[cfg(test)]
 mod tests {

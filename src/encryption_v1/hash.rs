@@ -1,9 +1,11 @@
 use crate::constants::PASSWORD_STRENGTH_SCORE;
 use aes_gcm::aead::generic_array::{typenum, GenericArray};
-use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHasher};
+use argon2::password_hash::{Salt, SaltString};
+use argon2::{Argon2, PasswordHash, PasswordHasher};
 use base64::engine::Engine;
 use sha3::{Digest, Sha3_256};
+
+use super::encryption::MasterKey;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PasswordHashErrors {
@@ -21,14 +23,17 @@ pub enum PasswordHashErrors {
 * Will be user to create the master key. This key is used to derive encryption keys and signing key for the user.
 * It is essential that the password is kept secret or all the encrypted data can be lost.
 */
-pub fn argon2id_hash_password(
-    password: &str,
-    email: &str,
-    salt_addon: &str,
-) -> Result<String, PasswordHashErrors> {
+pub fn argon2id_hash_password<'a, 'b>(
+    password: &'a str,
+    email: &'a str,
+    salt_addon: Salt<'a>, 
+) -> Result<PasswordHash<'b>, PasswordHashErrors>
+// Specifically the salt must outlive the password hash.
+where 'a:'b
+{
     // Hash the email with sha512 to get a 64 bytes hash. Which is the max size for argon2id salt. Perfect.
     let mut sha256_hasher = Sha3_256::new(); //Sha3_512::new();
-    sha256_hasher.update(salt_addon.as_bytes()); // This is just additional entropy to make the email more unique. Might be useful?
+    sha256_hasher.update(salt_addon.as_str().as_bytes()); // This is just additional entropy to make the email more unique. Might be useful?
     sha256_hasher.update(email.as_bytes());
     let email_hash: GenericArray<_, _> = sha256_hasher.finalize();
     let _password_strength = password_strength(email, password, None)?;
@@ -38,12 +43,13 @@ pub fn argon2id_hash_password(
 
     // Base64 expand size by 1/3
     let encoded = base64::engine::general_purpose::STANDARD_NO_PAD.encode(email_hash.as_slice());
-    let salt = SaltString::from_b64(&encoded).map_err(PasswordHashErrors::PasswordHashError)?;
+    //let salt = SaltString::from_b64(&encoded).map_err(PasswordHashErrors::PasswordHashError)?; .as_salt()
     let argon2id = Argon2::default();
     let password_hash = argon2id
-        .hash_password(password.as_bytes(), salt.as_salt())
+        .hash_password(password.as_bytes(), salt_addon)
         .map_err(PasswordHashErrors::PasswordHashError)?;
-    Ok(password_hash.to_string())
+
+    Ok(password_hash)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -84,12 +90,12 @@ pub fn password_strength(
 }
 
 pub fn bucket_key_hash_sha256(
-    password_hash: String,
+    password_hash: &MasterKey,
     bucket_id: &uuid::Uuid,
 ) -> GenericArray<u8, typenum::U32> {
     let mut hasher = Sha3_256::new(); //Sha3_512::new();
     hasher.update(bucket_id.as_bytes());
-    hasher.update(password_hash.to_string().as_bytes());
+    hasher.update(password_hash.0.as_bytes());
 
     hasher.finalize()
 }

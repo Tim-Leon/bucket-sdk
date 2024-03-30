@@ -2,6 +2,7 @@ use crate::client::query_client::backend_api::{AccountLoginFinishRequest, Accoun
 use crate::client::query_client::QueryClient;
 use crate::controller::account::errors::{LoginError, RegisterError};
 
+use crate::encryption_v1::encryption::create_ed25519_signing_keys;
 use crate::encryption_v1::hash::password_strength;
 use crate::{
     constants::PASSWORD_STRENGTH_SCORE,
@@ -86,7 +87,7 @@ pub async fn register(
     if password_strength(&email, &password, None)? < PASSWORD_STRENGTH_SCORE {
         return Err(RegisterError::PasswordTooWeak);
     }
-    let secrets = encryption_v1::encryption::setup(password, email)?;
+    let master_key = encryption_v1::encryption::setup(password, email)?;
     let mut rng = rand::thread_rng();
     let oprf_start =
         opaque_ke::ClientRegistration::<DefaultCipherSuite>::start(&mut rng, password.as_bytes())
@@ -109,11 +110,13 @@ pub async fn register(
         ClientRegistrationFinishParameters::default(),
     )?;
 
+    let signing_key = create_ed25519_signing_keys(&master_key).unwrap();
+
     let finish_req = CreateAccountFinishRequest {
         oprf: oprf_finish.message.serialize().to_vec(),
         username: username.to_string(),
         session_id: start_resp.session_id,
-        public_signing_key: secrets.get_ed25519_public_signing_key().as_slice().to_vec(),
+        public_signing_key: signing_key.pk.to_vec(),
     };
     let finish_resp = query_client
         .create_account_finish(finish_req)

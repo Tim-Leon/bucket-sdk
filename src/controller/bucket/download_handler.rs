@@ -88,12 +88,12 @@ impl BucketFileDownloadHandler for WebBucketFileWriter {
         match decrypted_buffer {
             Either::Left(decrypted_buffer) => {
                 self.write_target_file
-                    .write_chunk(&decrypted_buffer, self.offset);
+                    .write_chunk(&decrypted_buffer, self.offset).unwrap();
                 self.offset += decrypted_buffer.len() as u64;
             }
             Either::Right(decrypted_buffer) => {
                 self.write_target_file
-                    .write_chunk(&decrypted_buffer, self.offset);
+                    .write_chunk(&decrypted_buffer, self.offset).unwrap();
                 self.offset += decrypted_buffer.len() as u64;
             }
         }
@@ -120,7 +120,7 @@ impl BucketFileDownloadHandler for WebBucketFileWriter {
         match self.decryption_module {
             None => {}
             Some(module) => {
-                module.finalize()?; //TODO: Invalid Signature
+                module.finalize(); //TODO: Invalid Signature
             }
         }
 
