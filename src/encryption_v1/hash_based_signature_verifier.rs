@@ -8,7 +8,8 @@ pub trait HashBasedSignatureVerifier: Clone + Sized {
 }
 #[derive(thiserror::Error, Debug)]
 pub enum Ed25519HighwayHashBasedSignatureVerifierError {
-
+    #[error(transparent)]
+    SignatureValidationError(#[from] ed25519_compact::Error),
 }
 
 #[derive(Clone)]
@@ -18,10 +19,10 @@ pub struct Ed25519HighwayHashBasedSignatureVerifier {
 }
 
 impl HashBasedSignatureVerifier for Ed25519HighwayHashBasedSignatureVerifier {
-    type Error = Ed25519HighwayHashBasedSignatureVerifier;
+    type Error = Ed25519HighwayHashBasedSignatureVerifierError;
     
     fn verify_hash(self, hash: impl AsRef<[u8]>) -> Result<(),Self::Error> {
-        self.public_key.verify(hash, &self.signature)?
+        Ok(self.public_key.verify(hash, &self.signature)?)
     }
 }
 
