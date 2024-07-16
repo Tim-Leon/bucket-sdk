@@ -12,6 +12,7 @@ use futures::io::BufReader;
 use futures::AsyncReadExt;
 use futures::StreamExt;
 use gloo::{console::__macro::JsValue, net::http::Request};
+use mime::Mime;
 //use tokio::io::BufReader;
 
 //use tokio_stream::StreamExt;
@@ -85,7 +86,7 @@ pub async fn upload_files_to_bucket(
             let url = url::Url::parse(upload_url.as_str())?;
             let chunk_size = (Byte::GIBIBYTE.as_u64() * 5) - filepath.file_size_in_bytes; //TODO: ???
                                                                                           //let chunk_size = GiB::from(1).to_bytes() as usize;
-            upload_to_url(&url, chunk_size, &mut upload_handler)
+            upload_to_url(&url, chunk_size, &mut upload_handler, mime::APPLICATION_OCTET_STREAM, None)
                 .await
                 .unwrap();
         }
@@ -302,7 +303,9 @@ pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
     }
     Ok(Vec::new())
 }
-
+pub enum ContentEncoding {
+    LZ4
+}
 /*
 * Upload to pre-signed url using PUT.
 */
@@ -310,6 +313,8 @@ pub async fn upload_to_url(
     url: &url::Url,
     chunk_size: u64,
     upload_handler: &mut BucketFileReader,
+    content_type: Mime,
+    content_encoding: Option<ContentEncoding>
 ) -> Result<u16, UploadToUrlError> {
     let file_chunk = upload_handler.on_upload_chunk(chunk_size).await?;
     //TypedArray::from

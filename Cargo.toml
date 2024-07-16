@@ -26,6 +26,7 @@ bucket-common-types = { git = "https://github.com/Tim-Leon/bucket-common-types.g
     "secret_share_link",
     "share_link",
 ] }
+zero-knowledge-encryption = { git = "https://github.com/Tim-Leon/zero-knowledge-encryption.git"}
 zxcvbn = "2.2.2"
 uuid = { version = "1.4.0", features = ["v4", "fast-rng"] }
 url = "2.4.0"
@@ -45,7 +46,7 @@ prost-types = "0.12.1"
 futures = { version = "0.3", default-features = false, features = ["std"] }
 
 anyhow = "*"
-base64 = "0.22.0"
+#base64 = "*"
 serde = "1.0.175"
 bytemuck = "1.13.1"
 gloo = { version = "0.11.0", features = ["futures", "net", "file", "worker"] }

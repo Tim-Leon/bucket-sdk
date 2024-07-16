@@ -25,7 +25,8 @@ mod common;
 #[cfg(test)]
 mod tests {
 
-    use bucket_sdk::{controller::account::authentication, query_client::QueryClient};
+    use bucket_sdk::{controller::account::authentication, };
+    use bucket_sdk::client::query_client::QueryClient;
 
     #[tokio::test]
     async fn check_signup() {

@@ -1,6 +1,5 @@
-use crate::encryption_v1::encryption::EncryptionSetupError;
-use crate::encryption_v1::hash::PasswordStrengthError;
 use opaque_ke::errors::ProtocolError;
+use crate::controller::account::authentication::PasswordStrengthError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum LoginError {
@@ -13,7 +12,8 @@ pub enum LoginError {
     #[error("Password Too Weak")]
     PasswordTooWeak,
     #[error(transparent)]
-    PasswordError(#[from] PasswordStrengthError),
+    PasswordStrengthError(#[from] PasswordStrengthError),
+
 }
 
 //https://stackoverflow.com/questions/74973908/how-to-use-thiserror-to-forward-an-error-with-a-generic-type-parameter
@@ -36,8 +36,6 @@ pub enum RegisterError {
     PasswordTooWeak,
     #[error(transparent)]
     PasswordStrengthError(#[from] PasswordStrengthError),
-    #[error(transparent)]
-    EncryptionSetupError(#[from] EncryptionSetupError),
 }
 
 //https://stackoverflow.com/questions/74973908/how-to-use-thiserror-to-forward-an-error-with-a-generic-type-parameter

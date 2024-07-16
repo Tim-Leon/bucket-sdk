@@ -1,12 +1,12 @@
 use crate::controller::bucket::io::file::{BucketFile, BucketFileTrait};
-use crate::encryption_v1::decryption_module::{
-    DecryptionError, DecryptionModule, ZeroKnowledgeDecryptionModuleV1,
-};
 use async_trait::async_trait;
 use bucket_common_types::BucketEncryption;
 use futures::future::Either;
 use mime::{FromStrError, Mime};
 use std::str::FromStr;
+use zero_knowledge_encryption::encryption::aead::decryption_module::{DecryptionError, ZeroKnowledgeDecryptionModuleV1};
+use zero_knowledge_encryption::encryption::aead::DecryptionModule;
+
 #[derive(Debug, thiserror::Error)]
 pub enum BucketDownloadHandlerErrors {
     #[error(transparent)]

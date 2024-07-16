@@ -42,14 +42,14 @@ fn convert_html_input_element_to_file_list(
     input: web_sys::HtmlInputElement,
 ) -> Result<gloo::file::FileList, ConvertHtmlInputElementToFileListError> {
     //let el: web_sys::HtmlInputElement = input.target_unchecked_into();
-    match input.files() {
+    return match input.files() {
         Some(files) => {
             if files.length() < 1 {
                 return Err(ConvertHtmlInputElementToFileListError::Empty);
             }
-            return Ok(files.into());
+            Ok(files.into())
         }
-        None => return Err(ConvertHtmlInputElementToFileListError::Empty),
+        None => Err(ConvertHtmlInputElementToFileListError::Empty),
     }
 }
 

@@ -1,19 +1,19 @@
+use std::convert::Infallible;
 use crate::client::query_client::backend_api::{AccountLoginFinishRequest, AccountLoginStartRequest, CreateAccountFinishRequest, CreateAccountStartRequest};
 use crate::client::query_client::QueryClient;
 use crate::controller::account::errors::{LoginError, RegisterError};
 
-use crate::encryption_v1::encryption::create_ed25519_signing_keys;
-use crate::encryption_v1::hash::password_strength;
 use crate::{
     constants::PASSWORD_STRENGTH_SCORE,
-    encryption_v1,
 };
 use argon2::Argon2;
+use argon2::password_hash::SaltString;
 
 use opaque_ke::{
     rand, ClientLogin, ClientLoginFinishParameters, ClientRegistrationFinishParameters,
     CredentialResponse, RegistrationResponse,
 };
+use zero_knowledge_encryption::master_key::{MasterKey, MtESignatureKey};
 
 //The ciphersuite trait allows to specify the underlying primitives that will
 //be used in the OPAQUE protocol
@@ -31,6 +31,45 @@ impl opaque_ke::CipherSuite for DefaultCipherSuite {
 }
 
 type JwtToken = String;
+
+#[derive(Debug, thiserror::Error)]
+pub enum PasswordStrengthError {
+    #[error("Password is too weak")]
+    TooWeak,
+    #[error("Password is too short")]
+    TooShort,
+    #[error("Password entropy error")]
+    EntropyError(#[from] zxcvbn::ZxcvbnError),
+    #[error("Password's do not match")]
+    NotMatching,
+}
+
+// Will check password strength score against constant PASSWORD_STRENGTH_SCORE.
+pub fn password_strength(
+    email: &str,
+    password: &str,
+    repeated_password: Option<&str>,
+) -> Result<u8, PasswordStrengthError> {
+    if password.len() < 8 {
+        return Err(PasswordStrengthError::TooShort);
+    }
+    let entropy = zxcvbn::zxcvbn(password, &[email])?;
+    let score = entropy.score();
+    if score < PASSWORD_STRENGTH_SCORE {
+        return Err(PasswordStrengthError::TooWeak);
+    }
+    match repeated_password {
+        Some(v) => {
+            if password != v {
+                return Err(PasswordStrengthError::NotMatching);
+            }
+        }
+        None => {}
+    }
+    Ok(score)
+}
+
+
 
 pub async fn login(
     query_client: &mut QueryClient,
@@ -83,12 +122,13 @@ pub async fn register(
     username: &str,
     password: &str,
     captcha: &str,
+
 ) -> Result<JwtToken, RegisterError> {
     if password_strength(&email, &password, None)? < PASSWORD_STRENGTH_SCORE {
         return Err(RegisterError::PasswordTooWeak);
     }
-    let master_key = encryption_v1::encryption::setup(password, email)?;
     let mut rng = rand::thread_rng();
+    let master_key = MasterKey::generate(&mut rng); // setup(password, email)?;
     let oprf_start =
         opaque_ke::ClientRegistration::<DefaultCipherSuite>::start(&mut rng, password.as_bytes())
             .unwrap();
@@ -110,7 +150,7 @@ pub async fn register(
         ClientRegistrationFinishParameters::default(),
     )?;
 
-    let signing_key = create_ed25519_signing_keys(&master_key).unwrap();
+    let signing_key = MtESignatureKey::new(&master_key, SaltString::from_b64()) //create_ed25519_signing_keys(&master_key).unwrap();
 
     let finish_req = CreateAccountFinishRequest {
         oprf: oprf_finish.message.serialize().to_vec(),

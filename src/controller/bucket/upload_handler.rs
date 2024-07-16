@@ -1,6 +1,7 @@
-use crate::encryption_v1::encryption_module::{EncryptionError, EncryptionModule, ZeroKnowledgeEncryptionModuleV1};
 use async_trait::async_trait;
 use bucket_common_types::BucketEncryption;
+use zero_knowledge_encryption::encryption::aead::encryption_module::{EncryptionError, ZeroKnowledgeEncryptionModuleV1};
+use zero_knowledge_encryption::encryption::aead::EncryptionModule;
 
 use super::io::file::{BucketFile, BucketFileTrait};
 
