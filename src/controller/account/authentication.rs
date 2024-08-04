@@ -1,4 +1,6 @@
 use std::convert::Infallible;
+use argon2::Argon2;
+use argon2::password_hash::SaltString;
 use crate::client::query_client::backend_api::{AccountLoginFinishRequest, AccountLoginStartRequest, CreateAccountFinishRequest, CreateAccountStartRequest};
 use crate::client::query_client::QueryClient;
 use crate::controller::account::errors::{LoginError, RegisterError};
@@ -6,8 +8,6 @@ use crate::controller::account::errors::{LoginError, RegisterError};
 use crate::{
     constants::PASSWORD_STRENGTH_SCORE,
 };
-use argon2::Argon2;
-use argon2::password_hash::SaltString;
 
 use opaque_ke::{
     rand, ClientLogin, ClientLoginFinishParameters, ClientRegistrationFinishParameters,
@@ -149,8 +149,8 @@ pub async fn register(
         RegistrationResponse::deserialize(start_resp.oprf.as_slice())?,
         ClientRegistrationFinishParameters::default(),
     )?;
-
-    let signing_key = MtESignatureKey::new(&master_key, &SaltString::from_b64(email).unwrap().as_salt()).unwrap(); //create_ed25519_signing_keys(&master_key).unwrap();
+    let salt = SaltString::from_b64(email).unwrap();
+    let signing_key = MtESignatureKey::new(&master_key, salt.as_salt()).unwrap(); //create_ed25519_signing_keys(&master_key).unwrap();
 
     let finish_req = CreateAccountFinishRequest {
         oprf: oprf_finish.message.serialize().to_vec(),
