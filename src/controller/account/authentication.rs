@@ -150,13 +150,13 @@ pub async fn register(
         ClientRegistrationFinishParameters::default(),
     )?;
 
-    let signing_key = MtESignatureKey::new(&master_key, SaltString::from_b64()) //create_ed25519_signing_keys(&master_key).unwrap();
+    let signing_key = MtESignatureKey::new(&master_key, &SaltString::from_b64(email).unwrap().as_salt()).unwrap(); //create_ed25519_signing_keys(&master_key).unwrap();
 
     let finish_req = CreateAccountFinishRequest {
         oprf: oprf_finish.message.serialize().to_vec(),
         username: username.to_string(),
         session_id: start_resp.session_id,
-        public_signing_key: signing_key.pk.to_vec(),
+        public_signing_key: signing_key.ed25519_key_pair.pk.to_vec(),
     };
     let finish_resp = query_client
         .create_account_finish(finish_req)

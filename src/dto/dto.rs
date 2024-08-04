@@ -14,7 +14,6 @@ use crate::{
 use crate::client::query_client::backend_api::*;
 pub struct CreateBucketParams {
     pub target_user_id: uuid::Uuid,
-    //  pub target_bucket_id: uuid::Uuid,
     pub name: String,
     pub visibility: Option<BucketVisibility>,
     pub encryption: Option<BucketEncryption>,
