@@ -13,6 +13,8 @@ wasm = []
 stream = []
 # Listen changes in the Storage, synchronization API support. for listening and parsing webhook events.
 sync = []
+
+webhook = []
 # Compress files before transit. 
 compression = []
 # 
@@ -20,14 +22,17 @@ compression = []
 web = ["wasm", "proto"]
 cli = ["proto", "s3", "native"]
 native = [] #"dep:tokio", "dep:tokio-stream"
-
+# Implements a fuse compatible Filesystem that can be mounted to create a virtual disk,
+# which connects directly to a predefined bucket.
+fuse = []
 [dependencies]
 bucket-common-types = { git = "https://github.com/Tim-Leon/bucket-common-types.git", features = [
     "secret_share_link",
     "share_link",
 ] }
+bucket-api = { git = "https://github.com/Tim-Leon/bucket-api.git", default-features = false, features = ["client-api"]}
 zero-knowledge-encryption = { git = "https://github.com/Tim-Leon/zero-knowledge-encryption.git"}
-zxcvbn = "2.2.2"
+zxcvbn = "3.1.0"
 uuid = { version = "1.4.0", features = ["v4", "fast-rng"] }
 url = "2.4.0"
 thiserror = "1.0.57"
@@ -62,17 +67,19 @@ rust_decimal = "1.33.1"
 pharos = "0.5.3"
 jsonwebtoken = "9.1.0"
 lunchbox = { version = "0.1.3", features = ["full-wasm"] }
-brotli = { version = "3.3.4", features = [] } #"simd"
-
+brotli = { version = "6.0.0", features = [] } #"simd"
+lz4_flex = "0.11.3"
 time = { version = "0.3.28", features = ["serde", "wasm-bindgen"] }
 passkey = "0.2.0"
-infer = "0.15.0"
+infer = "0.16.0"
 pkg-version = "1.0.0"
 log = "0.4.20"
 prokio = "0.1.0"
 email_address = "0.2.4"
 mnemonic = "1.1.1"
-dash-mpd = {version = "0.15.0", features = ["tokio"],optional = true}
+dash-mpd = {version = "0.16.6", features = ["tokio"],optional = true}
+tokio-tungstenite-wasm = "0.3.1"
+
 
 [target.'cfg(unix)'.dependencies]
 fuser = "0.14.0" # https://crates.io/crates/fuser

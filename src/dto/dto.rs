@@ -1,17 +1,11 @@
+use bucket_api::backend_api;
+use bucket_api::backend_api::{CreateBucketRequest, CreateBucketShareLinkRequest, CreateCheckoutRequest, DeleteAccountRequest, DeleteBucketRequest, DeleteFilesInBucketRequest, download_files_request, DownloadBucketRequest, DownloadFilesRequest, GetAccountDetailsRequest, GetBucketDetailsRequest, GetBucketFilestructureRequest, MoveFilesInBucketRequest, UpdateAccountRequest, UpdateBucketRequest, UploadFilesToBucketRequest};
 use bucket_common_types::{
-    unix_timestamp::UnixTimestamp, BucketCompression, BucketEncryption, BucketGuid,
-    BucketRedundancy, BucketStorageClass, BucketVisibility, PaymentModel, RegionCluster,
+    BucketCompression, BucketEncryption, BucketGuid, BucketRedundancy,
+    BucketStorageClass, BucketVisibility, PaymentModel, RegionCluster, unix_timestamp::UnixTimestamp,
 };
+use crate::controller::bucket::io::file::{BucketFile, BucketFileTrait, VirtualFileDetails};
 
-use crate::{
-    client::query_client::backend_api::{self, CreateBucketShareLinkRequest}, controller::bucket::{
-        bucket::DownloadFilesFromBucketError,
-        errors::{DownloadError, UploadError},
-        io::file::{BucketFile, BucketFileTrait, VirtualFileDetails},
-    }
-};
-
-use crate::client::query_client::backend_api::*;
 pub struct CreateBucketParams {
     pub target_user_id: uuid::Uuid,
     pub name: String,
@@ -97,6 +91,10 @@ pub struct UpdateBucketParams {
     pub is_bucket_cloneable: Option<bool>,
     pub is_sharable: Option<bool>,
 }
+
+
+
+
 
 #[derive(thiserror::Error, Debug)]
 pub enum UpdateBucketParamsParsingError {}
@@ -201,12 +199,14 @@ impl TryInto<UploadFilesToBucketRequest> for UploadFilesParams {
 }
 
 pub struct DownloadFilesParams {
-    pub target_bucket_id: uuid::Uuid,
     pub target_user_id: uuid::Uuid,
+    pub target_bucket_id: uuid::Uuid,
     pub target_directory: String,
     pub files: Vec<VirtualFileDetails>,
     pub hashed_password: Option<String>,
     pub bucket_encryption: Option<BucketEncryption>,
+
+    pub keep_file_structure: bool,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -259,7 +259,7 @@ impl TryInto<DownloadBucketRequest> for DownloadBucketParams {
 
 pub struct MoveFilesInBucketParams {
     pub from_bucket_guid: BucketGuid,
-    pub to_bukcet_owner_id: Option<uuid::Uuid>,
+    pub to_bucket_owner_id: Option<uuid::Uuid>,
     pub to_bucket_id: uuid::Uuid,
     pub from_filepaths: Vec<String>,
     pub to_filepath: String,
@@ -277,7 +277,7 @@ impl TryInto<MoveFilesInBucketRequest> for MoveFilesInBucketParams {
             from_bucket_owner_id: self.from_bucket_guid.user_id.to_string(),
             from_filepaths: self.from_filepaths,
             to_bucket_id: self.to_bucket_id.to_string(),
-            to_bucket_owner_id: self.to_bukcet_owner_id.map(|x| x.to_string()),
+            to_bucket_owner_id: self.to_bucket_owner_id.map(|x| x.to_string()),
             to_directory: self.to_filepath,
             is_capacity_destructive: self.is_capacity_destructive,
         })

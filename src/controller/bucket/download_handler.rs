@@ -1,11 +1,14 @@
 use crate::controller::bucket::io::file::{BucketFile, BucketFileTrait};
 use async_trait::async_trait;
-use bucket_common_types::BucketEncryption;
+use bucket_common_types::{BucketCompression, BucketEncryption};
 use futures::future::Either;
 use mime::{FromStrError, Mime};
 use std::str::FromStr;
+use uuid::Uuid;
 use zero_knowledge_encryption::encryption::aead::decryption_module::{DecryptionError, ZeroKnowledgeDecryptionModuleV1};
 use zero_knowledge_encryption::encryption::aead::DecryptionModule;
+use crate::compression::decompression::DefaultDecompressionModule;
+use crate::compression::DecompressModule;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BucketDownloadHandlerErrors {
@@ -25,6 +28,7 @@ pub enum BucketUploadHandlerErrors {}
 pub trait BucketFileDownloadHandler {
     type Error: std::error::Error + Send + Sync + 'static;
     type DecryptionModule: DecryptionModule;
+    type DecompressionModule: DecompressModule;
 
     fn on_download_start(
         &mut self,
@@ -33,6 +37,8 @@ pub trait BucketFileDownloadHandler {
         from_directory: String,
         from_filename: String,
         encryption: Option<BucketEncryption>,
+        bucket_compression: Option<BucketCompression>,
+
         download_size_in_bytes: u64,
     ) -> Result<(), Self::Error>;
     // Called when a chunk is downloaded. It's up to the user to decrypt the chunk if the bucket is encrypted, or to save the chunk to a file.
@@ -55,25 +61,33 @@ pub struct WebBucketFileWriter {
 impl BucketFileDownloadHandler for WebBucketFileWriter {
     type Error = BucketDownloadHandlerErrors;
     type DecryptionModule = ZeroKnowledgeDecryptionModuleV1;
+    type DecompressionModule = DefaultDecompressionModule;
 
-    fn on_download_start(
-        &mut self,
-        _target_bucket_id: uuid::Uuid,
-        _target_user_id: uuid::Uuid,
-        _from_directory: String,
-        from_filename: String,
-        _encryption: Option<BucketEncryption>,
-        _download_size_in_bytes: u64,
-    ) -> Result<(), Self::Error> {
-        //let blob = Blob::from(self.write_target_file.clone());
-        //let bytes = read_as_bytes(&blob).await?;
-        let file = BucketFile::new(
-            from_filename.as_str(),
-            &Mime::from_str("application/octet-stream").unwrap(),
-        )
-        .unwrap();
-        Ok(())
+    fn on_download_start(&mut self, target_bucket_id: Uuid, target_user_id: Uuid, from_directory: String, from_filename: String, encryption: Option<BucketEncryption>, bucket_compression: Option<BucketCompression>, download_size_in_bytes: u64) -> Result<(), Self::Error> {
+            //let blob = Blob::from(self.write_target_file.clone());
+            //let bytes = read_as_bytes(&blob).await?;
+            let file = BucketFile::new(
+                from_filename.as_str(), &mime::APPLICATION_OCTET_STREAM
+                );
+            Ok(())
     }
+
+    //fn on_download_start(
+    //    &mut self,
+    //    _target_bucket_id: uuid::Uuid,
+    //    _target_user_id: uuid::Uuid,
+    //    _from_directory: String,
+    //    from_filename: String,
+    //    _encryption: Option<BucketEncryption>,
+    //    _download_size_in_bytes: u64,
+    //) -> Result<(), Self::Error> {
+    //    //let blob = Blob::from(self.write_target_file.clone());
+    //    //let bytes = read_as_bytes(&blob).await?;
+    //    let file = BucketFile::new(
+    //        from_filename.as_str(), &mime::APPLICATION_OCTET_STREAM
+    //        );
+    //    Ok(())
+    //}
     // Called when a chunk is downloaded. It's up to the user to decrypt the chunk if the bucket is encrypted, or to save the chunk to a file.
     async fn on_download_chunk(&mut self, chunk: &Vec<u8>) -> Result<(), Self::Error> {
         let decrypted_buffer: futures::future::Either<Vec<u8>, &Vec<u8>> =

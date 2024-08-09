@@ -1,12 +1,10 @@
-use crate::client::query_client::{
-    backend_api::{
-        get_account_details_request::User, DeleteAccountRequest, DeleteAccountResponse,
-        GetAccountDetailsRequest, GetAccountDetailsResponse, UpdateAccountRequest,
-        UpdateAccountResponse,
-    },
-    QueryClient,
-};
+use bucket_api::backend_api::{DeleteAccountRequest, DeleteAccountResponse, GetAccountDetailsRequest, GetAccountDetailsResponse, UpdateAccountRequest, UpdateAccountResponse};
+use tonic::{IntoRequest, Request};
+use tonic::Status;
+use crate::api::{BucketApiError, BucketClient};
 
+use crate::dto::dto::{DeleteAccountParams, GetAccountDetailsParams, UpdateAccountParams};
+use crate::request_ext::RequestAuthorizationMetadataExt;
 // pub async fn get_user_signing_key(
 //     client: &mut QueryClient,
 //     user_id: &uuid::Uuid,
@@ -19,29 +17,43 @@ use crate::client::query_client::{
 //     Ok(signing_key)
 // }
 
-pub async fn get_account_details(
-    client: &mut QueryClient,
-    user: User,
-) -> Result<GetAccountDetailsResponse, tonic::Status> {
-    let req = GetAccountDetailsRequest { user: Some(user) };
-    let resp = client.get_account_details(req).await?.into_inner();
-    Ok(resp)
+
+
+
+
+pub trait AccountClientExt {
+    async fn get_account_details(&mut self, param: GetAccountDetailsParams) -> Result<GetAccountDetailsResponse, BucketApiError>;
+
+    async fn update_account(&mut self, param: UpdateAccountParams) -> Result<UpdateAccountResponse, BucketApiError>;
+
+    async fn delete_account(&mut self, param: DeleteAccountParams) -> Result<DeleteAccountResponse, BucketApiError>;
 }
 
-pub async fn update_account(
-    client: &mut QueryClient,
-    req: UpdateAccountRequest,
-) -> Result<UpdateAccountResponse, tonic::Status> {
-    let resp = client.update_account(req).await?.into_inner();
-    Ok(resp)
-}
 
-pub async fn delete_account(
-    client: &mut QueryClient,
-    req: DeleteAccountRequest,
-) -> Result<DeleteAccountResponse, tonic::Status> {
-    let resp = client.delete_account(req).await?.into_inner();
-    Ok(resp)
+impl AccountClientExt for BucketClient {
+    async fn get_account_details(&mut self, param: GetAccountDetailsParams) -> Result<GetAccountDetailsResponse, BucketApiError> {
+        let mut gadr: GetAccountDetailsRequest = param.try_into().unwrap();
+        let mut req = gadr.into_request();
+        req.set_authorization_metadata(&self.api_token);
+        let resp = self.client.get_account_details(req).await?;
+        Ok(resp.into_inner())
+    }
+
+    async fn update_account(&mut self, param: UpdateAccountParams) -> Result<UpdateAccountResponse, BucketApiError> {
+        let mut uar: UpdateAccountRequest = param.try_into().unwrap();
+        let mut req = uar.into_request();
+        req.set_authorization_metadata(&self.api_token);
+        let resp = self.client.update_account(req).await?;
+        Ok(resp.into_inner())
+    }
+
+    async fn delete_account(&mut self, param: DeleteAccountParams) -> Result<DeleteAccountResponse, BucketApiError> {
+        let mut dar: DeleteAccountRequest = param.try_into().unwrap();
+        let mut req = dar.into_request();
+        req.set_authorization_metadata(&self.api_token);
+        let resp = self.client.delete_account(req).await?;
+        Ok(resp.into_inner())
+    }
 }
 
 // pub async fn set_account_signature_pk(

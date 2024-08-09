@@ -1,19 +1,125 @@
+use std::borrow::Cow;
 use std::convert::Infallible;
 use argon2::Argon2;
 use argon2::password_hash::SaltString;
-use crate::client::query_client::backend_api::{AccountLoginFinishRequest, AccountLoginStartRequest, CreateAccountFinishRequest, CreateAccountStartRequest};
+use bucket_api::backend_api::{AccountLoginFinishRequest, AccountLoginStartRequest, CreateAccountFinishRequest, CreateAccountStartRequest};
+use email_address::EmailAddress;
 use crate::client::query_client::QueryClient;
-use crate::controller::account::errors::{LoginError, RegisterError};
+use crate::controller::account::errors::{LoginError, RegistrationError};
 
 use crate::{
-    constants::PASSWORD_STRENGTH_SCORE,
+    constants::PASSWORD_STRENGTH_SCORE_REQUIREMENT,
 };
 
 use opaque_ke::{
     rand, ClientLogin, ClientLoginFinishParameters, ClientRegistrationFinishParameters,
     CredentialResponse, RegistrationResponse,
 };
+use tonic::transport::Channel;
+use url::quirks::password;
 use zero_knowledge_encryption::master_key::{MasterKey, MtESignatureKey};
+use zxcvbn::{Entropy, Score};
+use crate::api::ApiToken;
+
+pub struct LoginParams {
+    pub email_address: EmailAddress,
+    pub password: String,
+    pub totp_code: Option<String>,
+}
+
+pub struct RegistrationParams {
+    email_address: EmailAddress,
+    username: String,
+    password: String,
+    captcha: String,
+}
+
+pub trait AuthenticationClientExt {
+    async fn login(&mut self, param: &LoginParams) -> Result<ApiToken, LoginError>;
+
+    async fn register(&mut self, param: &RegistrationParams) -> Result<ApiToken, RegistrationError>;
+}
+
+impl AuthenticationClientExt for QueryClient {
+    async fn login(&mut self, param: &LoginParams) -> Result<ApiToken, LoginError> {
+        let password_strength_score = password_strength(&param.email_address, &param.password, None, &PASSWORD_STRENGTH_SCORE_REQUIREMENT)?;
+        let mut rng = rand::thread_rng();
+        let oprf_start = ClientLogin::<DefaultCipherSuite>::start(&mut rng, param.password.as_bytes())?;
+
+        let start_req = AccountLoginStartRequest {
+            email: param.email_address.to_string(),
+            oprf: oprf_start.message.serialize().to_vec(),
+        };
+        let start_resp = self
+            .account_login_start(start_req)
+            .await
+            .unwrap()
+            .into_inner();
+
+        let oprf_finish = oprf_start
+            .state
+            .finish(
+                param.password.as_bytes(),
+                CredentialResponse::deserialize(start_resp.oprf.as_slice())?,
+                ClientLoginFinishParameters::default(),
+            )
+            .unwrap();
+
+        let finish_req = AccountLoginFinishRequest {
+            oprf: oprf_finish.message.serialize().to_vec(),
+            session_id: start_resp.session_id,
+            totp_code: param.totp_code.clone(),
+        };
+
+        let finish_resp = self
+            .account_login_finish(finish_req)
+            .await?
+            .into_inner();
+        Ok(ApiToken::from(finish_resp.jwt_token as JwtToken))
+    }
+
+    async fn register(&mut self, param: &RegistrationParams) -> Result<ApiToken, RegistrationError> {
+        password_strength(&param.email_address, &param.password, None, &PASSWORD_STRENGTH_SCORE_REQUIREMENT)?;
+        let mut rng = rand::thread_rng();
+        let master_key = MasterKey::generate(&mut rng); // setup(password, email)?;
+        let oprf_start =
+            opaque_ke::ClientRegistration::<DefaultCipherSuite>::start(&mut rng, param.password.as_bytes())
+                .unwrap();
+
+        let start_req = CreateAccountStartRequest {
+            email: param.email_address.to_string(),
+            oprf: oprf_start.message.serialize().to_vec(),
+            captcha: param.captcha.to_string(),
+        };
+        let start_resp = self
+            .create_account_start(start_req)
+            .await?
+            .into_inner();
+
+        let oprf_finish = oprf_start.state.finish(
+            &mut rng,
+             param.password.as_bytes(),
+            RegistrationResponse::deserialize(start_resp.oprf.as_slice())?,
+            ClientRegistrationFinishParameters::default(),
+        )?;
+        let salt = SaltString::from_b64(&param.email_address.to_string()).unwrap();
+        let signing_key = MtESignatureKey::new(&master_key, salt.as_salt()).unwrap(); //create_ed25519_signing_keys(&master_key).unwrap();
+
+        let finish_req = CreateAccountFinishRequest {
+            oprf: oprf_finish.message.serialize().to_vec(),
+            username: param.username.to_string(),
+            session_id: start_resp.session_id,
+            public_signing_key: signing_key.ed25519_key_pair.pk.to_vec(),
+        };
+        let finish_resp = self
+            .create_account_finish(finish_req)
+            .await
+            .unwrap()
+            .into_inner();
+        let jwt_token = finish_resp.jwt_token as JwtToken;
+        Ok(ApiToken::from(jwt_token))
+    }
+}
 
 //The ciphersuite trait allows to specify the underlying primitives that will
 //be used in the OPAQUE protocol
@@ -30,33 +136,32 @@ impl opaque_ke::CipherSuite for DefaultCipherSuite {
     type Ksf = Argon2<'static>;
 }
 
-type JwtToken = String;
+
+pub type JwtToken = String;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PasswordStrengthError {
     #[error("Password is too weak")]
-    TooWeak,
+    PasswordEntryTooLow,
     #[error("Password is too short")]
     TooShort,
-    #[error("Password entropy error")]
-    EntropyError(#[from] zxcvbn::ZxcvbnError),
     #[error("Password's do not match")]
     NotMatching,
 }
 
-// Will check password strength score against constant PASSWORD_STRENGTH_SCORE.
 pub fn password_strength(
-    email: &str,
+    email: &email_address::EmailAddress,
     password: &str,
     repeated_password: Option<&str>,
-) -> Result<u8, PasswordStrengthError> {
+    entropy_requirement: &Score
+) -> Result<Score, PasswordStrengthError> {
     if password.len() < 8 {
         return Err(PasswordStrengthError::TooShort);
     }
-    let entropy = zxcvbn::zxcvbn(password, &[email])?;
+    let entropy = zxcvbn::zxcvbn(password, &[email.as_str()]);
     let score = entropy.score();
-    if score < PASSWORD_STRENGTH_SCORE {
-        return Err(PasswordStrengthError::TooWeak);
+    if score < *entropy_requirement {
+        return Err(PasswordStrengthError::PasswordEntryTooLow);
     }
     match repeated_password {
         Some(v) => {
@@ -73,19 +178,16 @@ pub fn password_strength(
 
 pub async fn login(
     query_client: &mut QueryClient,
-    email: String,
+    email: &EmailAddress,
     password: String,
     totp_code: Option<String>,
-) -> Result<JwtToken, LoginError> {
-    let password_strength_score = password_strength(&email, &password, None)?;
-    if password_strength_score < PASSWORD_STRENGTH_SCORE {
-        return Err(LoginError::PasswordTooWeak);
-    }
+) -> Result<ApiToken, LoginError> {
+    let password_strength_score = password_strength(email, &password, None, &PASSWORD_STRENGTH_SCORE_REQUIREMENT)?;
     let mut rng = rand::thread_rng();
     let oprf_start = ClientLogin::<DefaultCipherSuite>::start(&mut rng, password.as_bytes())?;
 
     let start_req = AccountLoginStartRequest {
-        email,
+        email: email.to_string(),
         oprf: oprf_start.message.serialize().to_vec(),
     };
     let start_resp = query_client
@@ -113,20 +215,18 @@ pub async fn login(
         .account_login_finish(finish_req)
         .await?
         .into_inner();
-    Ok(finish_resp.jwt_token as JwtToken)
+    Ok(ApiToken::from(finish_resp.jwt_token as JwtToken))
 }
 
 pub async fn register(
     query_client: &mut QueryClient,
-    email: &str,
+    email: &EmailAddress,
     username: &str,
     password: &str,
     captcha: &str,
 
-) -> Result<JwtToken, RegisterError> {
-    if password_strength(&email, &password, None)? < PASSWORD_STRENGTH_SCORE {
-        return Err(RegisterError::PasswordTooWeak);
-    }
+) -> Result<ApiToken, RegistrationError> {
+    password_strength(&email, &password, None, &PASSWORD_STRENGTH_SCORE_REQUIREMENT)?;
     let mut rng = rand::thread_rng();
     let master_key = MasterKey::generate(&mut rng); // setup(password, email)?;
     let oprf_start =
@@ -149,7 +249,7 @@ pub async fn register(
         RegistrationResponse::deserialize(start_resp.oprf.as_slice())?,
         ClientRegistrationFinishParameters::default(),
     )?;
-    let salt = SaltString::from_b64(email).unwrap();
+    let salt = SaltString::from_b64(email.as_str()).unwrap();
     let signing_key = MtESignatureKey::new(&master_key, salt.as_salt()).unwrap(); //create_ed25519_signing_keys(&master_key).unwrap();
 
     let finish_req = CreateAccountFinishRequest {
@@ -163,8 +263,8 @@ pub async fn register(
         .await
         .unwrap()
         .into_inner();
-    let jwt_token = finish_resp.jwt_token;
-    Ok(jwt_token)
+    let jwt_token = finish_resp.jwt_token as JwtToken;
+    Ok(ApiToken::from(jwt_token))
 }
 
 // pub fn set_jwt_token_cookie(token: JwtToken) {

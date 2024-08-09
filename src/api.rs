@@ -1,18 +1,15 @@
+use std::fmt::Display;
 use tonic::metadata::{Ascii, Binary, MetadataValue};
-use tonic::Request;
+use tonic::{IntoRequest, Request};
 
 use crate::client;
-use crate::client::query_client::backend_api;
-use crate::controller::bucket::bucket::{
-    bucket_download, download_files_from_bucket, upload_files_to_bucket, CreateFileDownloadHandler,
-    DownloadFilesFromBucketError,
-};
+use crate::controller::bucket::bucket::{bucket_download, CreateFileDownloadHandler, DownloadFilesFromBucketError, ClientUploadExt};
 use crate::controller::bucket::download_handler::BucketFileDownloadHandler;
 
-use crate::controller::account::authentication::register;
-use crate::controller::account::errors::RegisterError;
+use crate::controller::account::authentication::{AuthenticationClientExt, JwtToken, login, LoginParams, register};
+use crate::controller::account::errors::{LoginError, RegistrationError};
 use crate::controller::bucket::errors::{DownloadError, UploadError};
-use crate::controller::bucket::upload_handler::BucketFileReader;
+use crate::controller::bucket::upload_handler::{BucketFileReader, BucketFileUploadHandler};
 
 use crate::dto::dto::{
     CreateBucketParams, CreateBucketParamsParsingError, CreateBucketShareLinkParams,
@@ -27,28 +24,60 @@ use crate::dto::dto::{
     UpdateAccountParamsParsingError, UpdateBucketParams, UpdateBucketParamsParsingError,
     UploadFilesParams, UploadFilesRequestParsingError,
 };
-use client::query_client::backend_api::{CreateBucketRequest, DownloadBucketRequest};
-use client::query_client::backend_api::{
-    CreateBucketResponse, CreateBucketShareLinkRequest, CreateBucketShareLinkResponse,
-    CreateCheckoutRequest, CreateCheckoutResponse, DeleteAccountRequest, DeleteAccountResponse,
-    DeleteBucketRequest, DeleteFilesInBucketRequest, DeleteFilesInBucketResponse,
-    DownloadFilesRequest, GetAccountDetailsRequest, GetAccountDetailsResponse,
-    GetBucketDetailsRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest,
-    GetBucketFilestructureResponse, MoveFilesInBucketRequest, MoveFilesInBucketResponse,
-    UpdateAccountRequest, UpdateAccountResponse,
-};
-use client::query_client::backend_api::{
-    UpdateBucketRequest, UpdateBucketResponse, UploadFilesToBucketRequest,
-};
+
+
+// use client::query_client::backend_api::{CreateBucketRequest, DownloadBucketRequest};
+// use client::query_client::backend_api::{
+//     CreateBucketResponse, CreateBucketShareLinkRequest, CreateBucketShareLinkResponse,
+//     CreateCheckoutRequest, CreateCheckoutResponse, DeleteAccountRequest, DeleteAccountResponse,
+//     DeleteBucketRequest, DeleteFilesInBucketRequest, DeleteFilesInBucketResponse,
+//     DownloadFilesRequest, GetAccountDetailsRequest, GetAccountDetailsResponse,
+//     GetBucketDetailsRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest,
+//     GetBucketFilestructureResponse, MoveFilesInBucketRequest, MoveFilesInBucketResponse,
+//     UpdateAccountRequest, UpdateAccountResponse,
+// };
+// use client::query_client::backend_api::{
+//     UpdateBucketRequest, UpdateBucketResponse, UploadFilesToBucketRequest,
+// };
 use client::query_client::QueryClient;
 use std::rc::Rc;
 use std::str::FromStr;
+use bucket_api::backend_api;
+use bucket_api::backend_api::{CreateBucketRequest, CreateBucketResponse, DeleteBucketRequest, DeleteBucketResponse, DeleteFilesInBucketRequest, DeleteFilesInBucketResponse, DownloadBucketRequest, DownloadFilesRequest, GetBucketDetailsRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest, GetBucketFilestructureResponse, MoveFilesInBucketRequest, MoveFilesInBucketResponse, UpdateBucketRequest, UpdateBucketResponse, UploadFilesToBucketRequest};
+use email_address::EmailAddress;
+use mime::Mime;
+use tonic::transport::Uri;
+use crate::client::QueryClientBuilder;
+use crate::request_ext::RequestAuthorizationMetadataExt;
 
-pub struct ApiToken(String);
+#[derive(Clone, Debug, PartialEq)]
+pub struct ApiToken(String); //TODO: JWT Token
+
+impl TryFrom<&str> for ApiToken {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(Self { 0: value.to_string() })
+    }
+}
+
+impl From<JwtToken> for ApiToken {
+    fn from(value: JwtToken) -> Self {
+        Self {
+            0: value,
+        }
+    }
+}
+
+impl Display for ApiToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 pub struct BucketClient {
-    client: QueryClient,
-    api_token: String,
+    pub client: QueryClient,
+    pub api_token: ApiToken,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -97,91 +126,169 @@ pub enum BucketApiError {
     // Response parsing error
     #[error("GetBucketDetailsRequestFullyResponseParsingError")]
     GetBucketDetailsRequestFullyResponseParsingError,
+
+    #[error(transparent)]
+    ProtobufRequestFailed(#[from] tonic::Status),
+
 }
 
-pub fn set_authorization_metadata<T>(api_token:&str, req: &mut Request<T>) {
-    let meta = req.metadata_mut();
-    let mut token: String = "Bearer ".to_string();
-    token.push_str(api_token);
-    let meta_data = MetadataValue::<Ascii>::from_str(token.as_str()).unwrap();
-    meta.append("authorization", meta_data);
+
+pub trait BucketClientBuilder: Sized {
+    async fn from_token(api_url: Uri, api_token: ApiToken) -> Self;
+    async fn from_env() -> Self;
+    async fn plaintext_credentials_registration(api_url: Uri,
+                                        email: &email_address::EmailAddress,
+                                        username: &str,
+                                        password: &str,
+                                        captcha: &str) -> Result<Self, RegistrationError>;
+    async fn plaintext_credentials_login(api_url: Uri, login_params: &LoginParams) -> Result<Self, LoginError>;
 }
 
-impl BucketClient {
-    pub async fn new(api_url: &str, api_token: &str) -> Self {
+impl BucketClientBuilder for BucketClient {
+    async fn from_token(api_url: Uri, api_token: ApiToken) -> Self {
         let client = QueryClient::build(api_url).await;
         BucketClient {
             client,
-            api_token: api_token.to_string(),
+            api_token,
         }
     }
-    /// Uses enviorment variables:
+
+    /// Uses environment variables:
     /// API_URL
     /// API_TOKEN
-    pub async fn from_env() -> Self {
+    async fn from_env() -> Self {
         let api_url = std::env::var("API_URL").unwrap();
         let api_token = std::env::var("API_TOKEN").unwrap();
-        Self::new(&api_url, &api_token).await
+        let client = QueryClient::build(Uri::from_str(api_url.as_str()).unwrap()).await;
+
+        Self {
+            client,
+            api_token: ApiToken::try_from(api_token.as_str()).unwrap(),
+        }
     }
 
-    pub async fn from_plaintext_credentials(
-        api_url: &str,
-        email: &email_address::EmailAddress,
-        username: &str,
-        password: &str,
-        captcha: &str,
-    ) -> Result<Self, RegisterError> {
+    async fn plaintext_credentials_registration(api_url: Uri, email: &EmailAddress, username: &str, password: &str, captcha: &str) -> Result<Self, RegistrationError> {
         let mut client = QueryClient::build(api_url).await;
-        let token = register(&mut client, email.as_str(), username, password, captcha).await?;
+        let api_token = register(&mut client, email, username, password, captcha).await?;
         Ok(Self {
-            client: client,
-            api_token: token.to_string(),
+            client,
+            api_token,
         })
     }
 
-
-    pub fn set_authorization_metadata<T>(&self, req: &mut Request<T>) {
-        set_authorization_metadata(&self.api_token, req);
+    async fn plaintext_credentials_login(api_url: Uri, login_params: &LoginParams) -> Result<Self, LoginError> {
+        let mut client = QueryClient::build(api_url).await;
+        let api_token = client.login(login_params).await?;
+        Ok(BucketClient { client, api_token })
     }
+}
 
-    pub async fn create_bucket(
+
+
+pub trait ClientBucketExt<R: std::io::Read,W: std::io::Write> {
+    async fn create_bucket(&mut self, param:CreateBucketParams) -> Result<CreateBucketResponse, BucketApiError>;
+    async fn delete_bucket(&mut self, param: DeleteBucketParams) -> Result<DeleteBucketResponse, BucketApiError>;
+
+    async fn update_bucket(
         &mut self,
-        _param: CreateBucketParams,
-    ) -> Result<CreateBucketResponse, BucketApiError> {
-        let cbr: CreateBucketRequest = _param.try_into()?;
+        param: UpdateBucketParams,
+    ) -> Result<UpdateBucketResponse, BucketApiError>;
+
+    async fn get_bucket_details(
+        &mut self,
+        param: GetBucketDetailsParams,
+    ) -> Result<GetBucketDetailsResponse, BucketApiError>;
+
+    async fn upload_files_to_bucket(
+        &mut self,
+        param: UploadFilesParams,
+        upload_file_handler: impl BucketFileUploadHandler<R, W>,
+    ) -> Result<(), BucketApiError>;
+    ///https://repost.aws/questions/QUxynkZDbASDaqrUcpx_sILQ/s3-support-multiple-byte-ranges-download
+    async fn download_files_from_bucket<T>(
+        &mut self,
+        param: DownloadFilesParams,
+        //file_handle: BucketFileTrait<Error = BucketFileError, FileHandle = FileHandle>,
+        // Hook function will take in the details for the file and either return a WebBucketFile or NativeBucketFile depending on enviorment implementation, diffrent between WASM and NATIVE.
+        create_file_download_handler: impl CreateFileDownloadHandler<T>,
+        //file_choser: T where T impl (VirtualFileDetails, String) -> VirtualBucketFile,
+        additional_param: Rc<T>,
+    ) -> Result<(), BucketApiError>;
+
+
+    ///
+    /// Downloads the entire bucket.
+    /// # Arguments
+    ///
+    /// * `param`:
+    /// * `create_file_download_handler`:
+    /// * `additional_param`:
+    ///
+    /// returns: Result<Vec<String, Global>, BucketApiError>
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    async fn download_bucket<T>(
+        &mut self,
+        param: DownloadBucketParams,
+                             create_file_download_handler: impl CreateFileDownloadHandler<T>,
+                             additional_param: Rc<T>,
+    ) -> Result<Vec<String>, BucketApiError>;
+
+    async fn move_files_in_bucket(
+        &mut self,
+        param: MoveFilesInBucketParams,
+    ) -> Result<MoveFilesInBucketResponse, BucketApiError>;
+
+    async fn delete_files_in_bucket(
+        &mut self,
+        param: DeleteFilesInBucketParams,
+    ) -> Result<DeleteFilesInBucketResponse, BucketApiError> ;
+
+
+    async fn get_bucket_filestructure_fully(
+        &mut self,
+         param: GetFilesystemDetailsParams,
+    ) -> Result<Vec< backend_api::File>, BucketApiError>;
+
+    async fn get_bucket_filestructure(
+        &mut self,
+        param: GetFilesystemDetailsParams,
+    ) -> Result<GetBucketFilestructureResponse, BucketApiError>;
+}
+
+
+impl<R: std::io::Read,W: std::io::Write> ClientBucketExt<R, W> for BucketClient {
+    async fn create_bucket(&mut self, param: CreateBucketParams) -> Result<CreateBucketResponse, BucketApiError> {
+        let cbr: CreateBucketRequest = param.try_into().unwrap();
         let mut req = Request::new(cbr);
-        self.set_authorization_metadata(&mut req);
+        req.set_authorization_metadata(&self.api_token);
         Ok(self.client.create_bucket(req).await.unwrap().into_inner())
     }
 
-    pub async fn delete_bucket(
-        &mut self,
-        _param: DeleteBucketParams,
-    ) -> Result<backend_api::DeleteBucketResponse, BucketApiError> {
-        let dbr: DeleteBucketRequest = _param.try_into()?;
+    async fn delete_bucket(&mut self, param: DeleteBucketParams) -> Result<DeleteBucketResponse, BucketApiError> {
+        let dbr: DeleteBucketRequest = param.try_into().unwrap();
         let mut req = Request::new(dbr);
-        self.set_authorization_metadata(&mut req);
+        req.set_authorization_metadata(&self.api_token);
         Ok(self.client.delete_bucket(req).await.unwrap().into_inner())
+
     }
 
-    pub async fn update_bucket(
-        &mut self,
-        _param: UpdateBucketParams,
-    ) -> Result<UpdateBucketResponse, BucketApiError> {
-        let ubr: UpdateBucketRequest = _param.try_into()?;
+    async fn update_bucket(&mut self, param: UpdateBucketParams) -> Result<UpdateBucketResponse, BucketApiError> {
+        let ubr: UpdateBucketRequest = param.try_into().unwrap();
         let mut req = Request::new(ubr);
-        self.set_authorization_metadata(&mut req);
+        req.set_authorization_metadata(&self.api_token);
         let resp = self.client.update_bucket(req).await.unwrap().into_inner();
         Ok(resp)
     }
 
-    pub async fn get_bucket_details(
-        &mut self,
-        _param: GetBucketDetailsParams,
-    ) -> Result<GetBucketDetailsResponse, BucketApiError> {
-        let gbdr: GetBucketDetailsRequest = _param.try_into()?;
+    async fn get_bucket_details(&mut self, param: GetBucketDetailsParams) -> Result<GetBucketDetailsResponse, BucketApiError> {
+        let gbdr: GetBucketDetailsRequest = param.try_into().unwrap();
         let mut req = Request::new(gbdr);
-        self.set_authorization_metadata(&mut req);
+        req.set_authorization_metadata(&self.api_token);
         Ok(self
             .client
             .get_bucket_details(req)
@@ -189,57 +296,76 @@ impl BucketClient {
             .unwrap()
             .into_inner())
     }
-    pub async fn upload_files_to_bucket(
-        &mut self,
-        param: UploadFilesParams,
-        upload_file_handler: BucketFileReader,
-    ) -> Result<(), BucketApiError> {
+
+    async fn upload_files_to_bucket(&mut self, param: UploadFilesParams, upload_file_handler: impl BucketFileUploadHandler<R, W>) -> Result<(), BucketApiError> {
         let uftbr: UploadFilesToBucketRequest = param.try_into()?;
         let mut req = Request::new(uftbr);
-        self.set_authorization_metadata(&mut req);
-        upload_files_to_bucket(&mut self.client, req, upload_file_handler).await?;
+        req.set_authorization_metadata(&self.api_token);
+        self.client.upload_files_to_bucket_raw(req, upload_file_handler).await?;
         Ok(())
     }
 
-    ///https://repost.aws/questions/QUxynkZDbASDaqrUcpx_sILQ/s3-support-multiple-byte-ranges-download
-    pub async fn download_files_from_bucket<DH: BucketFileDownloadHandler, T>(
-        &mut self,
-        _param: DownloadFilesParams,
-        //file_handle: BucketFileTrait<Error = BucketFileError, FileHandle = FileHandle>,
-        // Hook function will take in the details for the file and either return a WebBucketFile or NativeBucketFile depending on enviorment implementation, diffrent between WASM and NATIVE.
-        create_file_download_handler: impl CreateFileDownloadHandler<DH, T>,
-        //file_choser: T where T impl (VirtualFileDetails, String) -> VirtualBucketFile,
-        jwt_token: String,
-        keep_file_structure: bool,
-        additional_param: Rc<T>,
-    ) -> Result<(), BucketApiError> {
-        let dfr: DownloadFilesRequest = _param.try_into()?;
+    async fn download_files_from_bucket<T>(&mut self, param: DownloadFilesParams, create_file_download_handler: impl CreateFileDownloadHandler<T>, additional_param: Rc<T>) -> Result<(), BucketApiError> {
+        let keep_file_structure = param.keep_file_structure;
+        let dfr: DownloadFilesRequest = param.try_into()?;
         let mut req = Request::new(dfr);
-        self.set_authorization_metadata(&mut req);
-        download_files_from_bucket::<DH, T>(
-            &mut self.client,
+        req.set_authorization_metadata(&self.api_token);
+        self.client.download_files_from_bucket_raw::<T>(
             req,
             create_file_download_handler,
-            jwt_token,
+            &self.api_token,
             keep_file_structure,
             additional_param,
         )
-        .await?;
+            .await?;
         Ok(())
     }
+
+    async fn download_bucket<T>(&mut self, param: DownloadBucketParams, create_file_download_handler: impl CreateFileDownloadHandler<T>, additional_param: Rc<T>) -> Result<Vec<String>, BucketApiError> {
+        let keep_file_structure = param.keep_file_structure;
+        let dbr: DownloadBucketRequest = param.try_into().unwrap();
+        let mut req = dbr.into_request();
+        req.set_authorization_metadata(&self.api_token);
+        let resp = self.client.download_bucket_raw(req, keep_file_structure,create_file_download_handler, additional_param).await.unwrap();
+        Ok(resp)
+    }
+
+    async fn move_files_in_bucket(&mut self, param: MoveFilesInBucketParams) -> Result<MoveFilesInBucketResponse, BucketApiError> {
+        todo!()
+    }
+
+    async fn delete_files_in_bucket(&mut self, param: DeleteFilesInBucketParams) -> Result<DeleteFilesInBucketResponse, BucketApiError> {
+        todo!()
+    }
+
+    async fn get_bucket_filestructure_fully(&mut self, param: GetFilesystemDetailsParams) -> Result<Vec<backend_api::File>, BucketApiError> {
+        todo!()
+    }
+
+    async fn get_bucket_filestructure(&mut self, param: GetFilesystemDetailsParams) -> Result<GetBucketFilestructureResponse, BucketApiError> {
+        todo!()
+    }
+}
+
+
+impl BucketClient {
+
+
+
+
 
     pub async fn bucket_download<DH: BucketFileDownloadHandler, T>(
         &mut self,
         param: DownloadBucketParams,
-        create_file_download_handler: impl CreateFileDownloadHandler<DH, T>,
+        create_file_download_handler: impl CreateFileDownloadHandler<T>,
         additional_param: Rc<T>,
     ) -> Result<Vec<String>, BucketApiError> {
         let keep_file_structure = param.keep_file_structure;
         let dbr: DownloadBucketRequest = param.try_into()?;
         let mut req = Request::new(dbr);
-        self.set_authorization_metadata(&mut req);
+        req.set_authorization_metadata(&self.api_token);
 
-        let res = bucket_download::<DH, T>(
+        let res = bucket_download::<T>(
             &mut self.client,
             req,
             keep_file_structure,
@@ -258,7 +384,7 @@ impl BucketClient {
     ) -> Result<MoveFilesInBucketResponse, BucketApiError> {
         let mfibr: MoveFilesInBucketRequest = _param.try_into()?;
         let mut req = Request::new(mfibr);
-        self.set_authorization_metadata(&mut req);
+        req.set_authorization_metadata(&self.api_token);
         Ok(self
             .client
             .move_files_in_bucket(req)
@@ -273,7 +399,7 @@ impl BucketClient {
     ) -> Result<DeleteFilesInBucketResponse, BucketApiError> {
         let dfibr: DeleteFilesInBucketRequest = _param.try_into()?;
         let mut req = Request::new(dfibr);
-        self.set_authorization_metadata(&mut req);
+        req.set_authorization_metadata(&self.api_token);
         Ok(self
             .client
             .delete_files_in_bucket(req)
@@ -322,70 +448,10 @@ impl BucketClient {
     ) -> Result<GetBucketFilestructureResponse, BucketApiError> {
         let gbfs: GetBucketFilestructureRequest = _param.try_into()?;
         let mut req = Request::new(gbfs);
-        self.set_authorization_metadata(&mut req);
+        req.set_authorization_metadata(&self.api_token);
         Ok(self
             .client
             .get_bucket_filestructure(req)
-            .await
-            .unwrap()
-            .into_inner())
-    }
-
-    pub async fn update_account(
-        &mut self,
-        _param: UpdateAccountParams,
-    ) -> Result<UpdateAccountResponse, BucketApiError> {
-        let ua: UpdateAccountRequest = _param.try_into()?;
-        let mut req = Request::new(ua);
-        self.set_authorization_metadata(&mut req);
-        Ok(self.client.update_account(req).await.unwrap().into_inner())
-    }
-
-    pub async fn delete_account(
-        &mut self,
-        _param: DeleteAccountParams,
-    ) -> Result<DeleteAccountResponse, BucketApiError> {
-        let dar: DeleteAccountRequest = _param.try_into()?;
-        let mut req = Request::new(dar);
-        self.set_authorization_metadata(&mut req);
-        Ok(self.client.delete_account(req).await.unwrap().into_inner())
-    }
-
-    pub async fn get_account_details(
-        &mut self,
-        _param: GetAccountDetailsParams,
-    ) -> Result<GetAccountDetailsResponse, BucketApiError> {
-        let gadr: GetAccountDetailsRequest = _param.try_into()?;
-        let mut req = Request::new(gadr);
-        self.set_authorization_metadata(&mut req);
-        Ok(self
-            .client
-            .get_account_details(req)
-            .await
-            .unwrap()
-            .into_inner())
-    }
-
-    pub async fn create_checkout(
-        &mut self,
-        _param: CreateCheckoutParams,
-    ) -> Result<CreateCheckoutResponse, BucketApiError> {
-        let ccr: CreateCheckoutRequest = _param.try_into()?;
-        let mut req = Request::new(ccr);
-        self.set_authorization_metadata(&mut req);
-        Ok(self.client.create_checkout(req).await.unwrap().into_inner())
-    }
-
-    pub async fn create_bucket_share_link(
-        &mut self,
-        _param: CreateBucketShareLinkParams,
-    ) -> Result<CreateBucketShareLinkResponse, BucketApiError> {
-        let cbslr: CreateBucketShareLinkRequest = _param.try_into()?;
-        let mut req = Request::new(cbslr);
-        self.set_authorization_metadata(&mut req);
-        Ok(self
-            .client
-            .create_bucket_share_link(req)
             .await
             .unwrap()
             .into_inner())

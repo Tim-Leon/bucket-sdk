@@ -6,6 +6,7 @@ use tonic::async_trait;
 
 use super::file::BucketFileTrait;
 
+#[derive(Clone)]
 pub struct VirtualNativeBucketFile {
     //pub file_details: Arc<VirtualFileDetails>,
     //pub file_handle: Option<std::fs::File>,

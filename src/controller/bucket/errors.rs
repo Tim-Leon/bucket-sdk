@@ -48,6 +48,8 @@ pub enum UploadError {
     ParseError(#[from] url::ParseError),
     #[error(transparent)]
     PoisonError(#[from] Box<dyn std::error::Error>),
+    #[error("StorageNotAvailable")]
+    StorageNotAvailable,
 }
 
 impl<T: 'static> From<PoisonError<T>> for UploadError {

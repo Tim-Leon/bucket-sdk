@@ -16,11 +16,35 @@ Explore our codebase and leverage the powerful functionalities offered by Bucket
 
 
 ## TODO: 
-Add logging for information gathering
-fix upload and download code.
-fix up the API a bit.
-make all enpoint callable.
-Add suport for virtual filesystem.
-test
-mock
-make sure backend and client work in harmony
+- Add logging for information gathering
+- fix upload and download code.
+- fix up the API a bit.
+- make all enpoint callable.
+- Add suport for virtual filesystem.
+- test
+- mock
+- make sure backend and client work in harmony
+- TODO: Instead of using type to decide which filestore to use, use trait and have the implementaion accept any struct that implements that trait. 
+
+Each upload and download creates an upload-/download-handler. 
+this handler is a trait that already have implementation for filesystem, other implementations will support AWS, Google cloud and other sources to upload from and support for zero knowledge encryption. 
+
+The upload process starts with a protobuf request asking to upload X files, with the number of bytes, this amount of storage is guaranteed for the duration of the upload to be available to the user.  
+after the successful request, a response is set containing a list of URLs that correspond to a file upload. The bytes are then sent to the URL for each file, note that the size can not be changed and it's up to the client to fill the compleate request. 
+the upload support being parallel. 
+
+
+# Navigation Url's
+
+- "bucketdrive.co/{user_id}/{bucket_id}"
+
+### Download
+
+- "eu-central-1-1.bucketdrive.co/download/{user_id}/{bucket_id}/paths"
+- "eu-central-1-1.bucketdrive.co/download/{user_id}/{bucket_id}/path"
+- "eu-central-1-1.bucketdrive.co/download/{user_id}/{bucket_id}/path"
+
+### Upload
+
+- "bucketdrive.co/upload/{user_id}/{bucket_id}"
+- "bucketdrive.co/upload/{user_id}/{bucket_id}/path"

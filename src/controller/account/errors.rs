@@ -27,7 +27,7 @@ impl<T> From<ProtocolError<T>> for LoginError {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum RegisterError {
+pub enum RegistrationError {
     #[error("Oprf protocol error")]
     OprfError,
     #[error(transparent)]
@@ -39,7 +39,7 @@ pub enum RegisterError {
 }
 
 //https://stackoverflow.com/questions/74973908/how-to-use-thiserror-to-forward-an-error-with-a-generic-type-parameter
-impl<T> From<ProtocolError<T>> for RegisterError {
+impl<T> From<ProtocolError<T>> for RegistrationError {
     fn from(_err: ProtocolError<T>) -> Self {
         // Get details from the error you want,
         // or even implement for both T variants.

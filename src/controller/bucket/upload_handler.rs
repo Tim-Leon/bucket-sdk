@@ -1,8 +1,10 @@
+use std::io::Cursor;
 use async_trait::async_trait;
-use bucket_common_types::BucketEncryption;
+use bucket_common_types::{BucketCompression, BucketEncryption};
+use prost::bytes::Bytes;
 use zero_knowledge_encryption::encryption::aead::encryption_module::{EncryptionError, ZeroKnowledgeEncryptionModuleV1};
 use zero_knowledge_encryption::encryption::aead::EncryptionModule;
-
+use crate::compression::{CompressorModule, DecompressModule};
 use super::io::file::{BucketFile, BucketFileTrait};
 
 #[derive(Debug, thiserror::Error)]
@@ -15,15 +17,19 @@ pub enum BucketDownloadHandlerFileErrors {
     EncryptionError(#[from] EncryptionError),
 }
 
-pub struct BucketFileReader {
+#[derive(Clone)]
+pub struct BucketFileReader<R, W> {
     pub read_target_file: BucketFile,
     pub encryption_module: Option<ZeroKnowledgeEncryptionModuleV1>,
     pub offset: u64,
+    pub compressor: dyn CompressorModule<R, W, Error=()>,
+    pub bucket_compression: BucketCompression,
+    pub use_client_compression : bool,
 }
 
 // A handler is created for each file upload. And will have multiple handlers running in parallel.
 #[async_trait(?Send)]
-pub trait BucketFileUploadHandler {
+pub trait BucketFileUploadHandler<R: std::io::Read,W: std::io::Write> : CompressorModule<R, W> + Clone {
     // : Send + Sync
     type Error;
     // Called when the upload starts.
@@ -34,6 +40,8 @@ pub trait BucketFileUploadHandler {
         to_directory: String,
         to_filename: String,
         encryption: Option<BucketEncryption>,
+        bucket_compression: Option<BucketCompression>,
+        use_client_side_compression: bool,
         upload_size_in_bytes: u64,
     ) -> Result<u64, Self::Error>;
     // Called when a chunk is uploaded. returns the chunk to be uploaded. It's up to the implementation to encrypt the chunk if the bucket is encrypted.
@@ -42,18 +50,50 @@ pub trait BucketFileUploadHandler {
     fn on_upload_finish(self) -> Result<(), Self::Error>;
 }
 
+pub enum CompressionModuleError {
+
+}
+
+impl<R: std::io::Read, W: std::io::Write> CompressorModule<R, W> for BucketFileReader {
+    type Error = CompressionModuleError;
+
+    fn new(writer: W,bucket_compression: BucketCompression, use_client_side_compression: bool) -> Self {
+        Self{
+            read_target_file: (),
+            encryption_module: None,
+            offset: 0,
+            bucket_compression,
+            use_client_compression: false,
+        }
+    }
+
+    fn compress_chunk(&self, bytes: &Bytes) -> Result<Vec<u8>, Self::Error> {
+        todo!()
+    }
+
+    fn compress_stream(&self, reader: R) -> Result<(), Self::Error> {
+
+    }
+
+    fn get_supported_compression() -> &'static [BucketCompression] {
+        todo!()
+    }
+}
+
 #[async_trait(?Send)]
-impl BucketFileUploadHandler for BucketFileReader {
+impl<R: std::io::Read, W: std::io::Write> BucketFileUploadHandler<R, W> for BucketFileReader<R, W> {
     //BucketDownloadHandlerFile
     type Error = BucketDownloadHandlerFileErrors;
     fn on_upload_start(
         &self,
-        _target_bucket_id: uuid::Uuid,
-        _target_user_id: uuid::Uuid,
-        _to_directory: String,
-        _to_filename: String,
-        bucket_encryption: Option<BucketEncryption>,
-        _upload_size_in_bytes: u64,
+        target_bucket_id: uuid::Uuid,
+        target_user_id: uuid::Uuid,
+        to_directory: String,
+        to_filename: String,
+        encryption: Option<BucketEncryption>,
+        bucket_compression: Option<BucketCompression>,
+        use_client_side_compression: bool,
+        upload_size_in_bytes: u64,
     ) -> Result<u64, Self::Error> {
         match bucket_encryption {
             Some(_bucket_encryption) => match &self.encryption_module {
