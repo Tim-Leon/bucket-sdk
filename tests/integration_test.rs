@@ -24,26 +24,32 @@ mod common;
 
 #[cfg(test)]
 mod tests {
-
-    use bucket_sdk::{controller::account::authentication, };
-    use bucket_sdk::client::query_client::QueryClient;
+    use std::str::FromStr;
+    use email_address::EmailAddress;
+    use bucket_sdk::api::AuthenticationClientExt;
+    use bucket_sdk::captcha::Captcha;
+    use bucket_sdk::client::grpc::native::client::query_client;
+    use bucket_sdk::client::grpc::native::client::query_client::QueryClient;
+    use bucket_sdk::client::grpc::QueryClientBuilder;
+    use bucket_sdk::dto::authentication::RegistrationParams;
 
     #[tokio::test]
     async fn check_signup() {
         let mut query_client = QueryClient::build_from_env();
-        let email = "email@domain.com".to_string();
+        let email = EmailAddress::from_str("email@domain.com").unwrap();
         let username = "awesomeusername".to_string();
         let password = "awesomepassword".to_string();
         let captcha = "".to_string();
-        authentication::register(
-            &mut query_client,
-            email.as_str(),
-            username.as_str(),
-            password.as_str(),
-            captcha.as_str(),
-        )
-        .await
-        .unwrap();
+        let register_params = RegistrationParams {
+            email_address: email,
+            username,
+            password,
+            captcha: Captcha { 0: captcha },
+        };
+        let mut client = query_client.await;
+        let api_token = client.register(&register_params).await.unwrap();
+        let client = QueryClientBuilder::build(url).await;
+
     }
 
     #[tokio::test]

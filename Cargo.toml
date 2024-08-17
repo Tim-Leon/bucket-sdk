@@ -5,10 +5,10 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-default = ["web"]
+#default = ["web"]
 s3 = []
 proto = []
-wasm = []
+#wasm = []
 # Stream API compatibility, mpeg-dash video stream support
 stream = []
 # Listen changes in the Storage, synchronization API support. for listening and parsing webhook events.
@@ -19,9 +19,9 @@ webhook = []
 compression = []
 # 
 
-web = ["wasm", "proto"]
-cli = ["proto", "s3", "native"]
-native = [] #"dep:tokio", "dep:tokio-stream"
+#web = ["wasm", "proto"]
+# cli = ["proto", "s3", "native"]
+#native = [] #"dep:tokio", "dep:tokio-stream"
 # Implements a fuse compatible Filesystem that can be mounted to create a virtual disk,
 # which connects directly to a predefined bucket.
 fuse = []
@@ -54,7 +54,6 @@ anyhow = "*"
 #base64 = "*"
 serde = "1.0.175"
 bytemuck = "1.13.1"
-gloo = { version = "0.11.0", features = ["futures", "net", "file", "worker"] }
 zeroize = "1.6.0"
 async-trait = "0.1.72"
 mime = "0.3.17"
@@ -79,7 +78,7 @@ email_address = "0.2.4"
 mnemonic = "1.1.1"
 dash-mpd = {version = "0.16.6", features = ["tokio"],optional = true}
 tokio-tungstenite-wasm = "0.3.1"
-
+generic-array = { version = "1.1.0", features = [] }
 
 [target.'cfg(unix)'.dependencies]
 fuser = "0.14.0" # https://crates.io/crates/fuser
@@ -87,7 +86,10 @@ fuser = "0.14.0" # https://crates.io/crates/fuser
 [target.'cfg(windows)'.dependencies]
 winfsp = "0.11.3+winfsp-2.0" #https://crates.io/crates/winfsp
 
+
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+gloo = { version = "0.11.0", features = ["futures", "net", "file", "worker"] }
 wasm-bindgen-futures = "0.4"
 wasm-streams = "0.4.0"
 web-sys = { version = "0.3.64", features = [
@@ -123,6 +125,7 @@ tonic = { version = "0.12.1", default-features = false, features = [
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio = { version = "1.33", features = ["full"] }
 tokio-stream = { version = "0.1.14" }
+reqwest = { version = "0.12.5", features = ["default"] }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = "0.3.37"

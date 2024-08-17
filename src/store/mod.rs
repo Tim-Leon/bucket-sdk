@@ -1,6 +1,1 @@
-
-
-
-struct SecretStore {
-
-}
+struct SecretStore {}
