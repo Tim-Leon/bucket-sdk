@@ -17,6 +17,8 @@ pub trait HttpRequestContentEncodingHeaderExt {
     fn set_content_encoding(self, content_encoding: &[bucket_common_types::Encoding]) -> Self;
 }
 
+pub trait HttpRequestInTransitEncryptionHeaderExt {
+}
 
 
 // pub trait RequestBuilderCompressionExt<R: std::io::Read,W: std::io::Write>  {

@@ -1,7 +1,7 @@
 use bucket_common_types::Encoding;
 use mime::Mime;
 use reqwest::RequestBuilder;
-use crate::client::http::http_request_ext::{HttpRequestAuthorizationMetadataExt, HttpRequestContentEncodingHeaderExt, HttpRequestContentTypeHeaderExt};
+use crate::client::http::http_request_ext::{HttpRequestAuthorizationMetadataExt, HttpRequestContentEncodingHeaderExt, HttpRequestContentTypeHeaderExt, HttpRequestInTransitEncryptionHeaderExt};
 use crate::token::ApiToken;
 
 impl HttpRequestContentEncodingHeaderExt for RequestBuilder {
@@ -26,3 +26,4 @@ impl HttpRequestContentTypeHeaderExt for RequestBuilder {
         todo!()
     }
 }
+

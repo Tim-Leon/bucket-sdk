@@ -24,14 +24,14 @@ mod common;
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-    use email_address::EmailAddress;
     use bucket_sdk::api::AuthenticationClientExt;
     use bucket_sdk::captcha::Captcha;
     use bucket_sdk::client::grpc::native::client::query_client;
     use bucket_sdk::client::grpc::native::client::query_client::QueryClient;
     use bucket_sdk::client::grpc::QueryClientBuilder;
     use bucket_sdk::dto::authentication::RegistrationParams;
+    use email_address::EmailAddress;
+    use std::str::FromStr;
 
     #[tokio::test]
     async fn check_signup() {
@@ -49,7 +49,6 @@ mod tests {
         let mut client = query_client.await;
         let api_token = client.register(&register_params).await.unwrap();
         let client = QueryClientBuilder::build(url).await;
-
     }
 
     #[tokio::test]

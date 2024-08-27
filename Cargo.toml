@@ -17,11 +17,13 @@ sync = []
 webhook = []
 # Compress files before transit. 
 compression = []
+
+encryption = []
 # 
 
-#web = ["wasm", "proto"]
+# web = ["wasm", "proto"]
 # cli = ["proto", "s3", "native"]
-#native = [] #"dep:tokio", "dep:tokio-stream"
+# native = [] #"dep:tokio", "dep:tokio-stream"
 # Implements a fuse compatible Filesystem that can be mounted to create a virtual disk,
 # which connects directly to a predefined bucket.
 fuse = []
@@ -33,7 +35,7 @@ bucket-common-types = { git = "https://github.com/Tim-Leon/bucket-common-types.g
 bucket-api = { git = "https://github.com/Tim-Leon/bucket-api.git", default-features = false, features = ["client-api"]}
 zero-knowledge-encryption = { git = "https://github.com/Tim-Leon/zero-knowledge-encryption.git"}
 zxcvbn = "3.1.0"
-uuid = { version = "1.4.0", features = ["v4", "fast-rng"] }
+uuid = { version = "1.4.0", features = ["v4", "fast-rng", "bytemuck", "atomic"] }
 url = "2.4.0"
 thiserror = "1.0.57"
 bitflags = "2.3.3"
@@ -41,9 +43,7 @@ sha3 = "0.10.8"
 argon2 = "0.5.0"
 highway = "1.1.0"
 opaque-ke = { version = "3.0.0-pre.4", features = ["argon2"] }
-ed25519-compact = { version = "2.0.4" }
 x25519-dalek = "2.0.0"
-aes-gcm = "0.10.2"
 once_cell = "1.18.0"
 prost = "0.13.1"
 prost-types = "0.13.1"
@@ -54,7 +54,7 @@ anyhow = "*"
 #base64 = "*"
 serde = "1.0.175"
 bytemuck = "1.13.1"
-zeroize = "1.6.0"
+zeroize = { version = "1.6.0" , features = ["alloc", "simd", "zeroize_derive"]}
 async-trait = "0.1.72"
 mime = "0.3.17"
 byte-unit = "5.1.4"
@@ -76,9 +76,24 @@ log = "0.4.20"
 prokio = "0.1.0"
 email_address = "0.2.4"
 mnemonic = "1.1.1"
-dash-mpd = {version = "0.16.6", features = ["tokio"],optional = true}
+dash-mpd = {version = "0.17.0", features = ["tokio"],optional = true}
 tokio-tungstenite-wasm = "0.3.1"
-generic-array = { version = "1.1.0", features = [] }
+
+
+base64 = "0.22.1"
+rand_core = {version = "0.9.0-alpha.1" }
+generic-array = { version = "1.0.0", features = ["zeroize", "alloc", "serde"] }
+
+# Used to mlock, mprotect, memory region and zeroize on drop.
+secrecy = { version = "0.8.0", features = ["alloc", "serde", "bytes"] }
+# Encryption algorithms
+digest = "0.11.0-pre.8"
+chacha20poly1305 = { version = "0.10.1" , features = ["heapless", "alloc", "stream"]}
+aes-gcm = { version = "0.10.2" , features = ["stream", "heapless", "zeroize", "arrayvec", "alloc", "aes"]}
+# Signing algorithm
+ed25519-compact = { version = "2.0.4" }
+
+
 
 [target.'cfg(unix)'.dependencies]
 fuser = "0.14.0" # https://crates.io/crates/fuser

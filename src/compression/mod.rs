@@ -13,7 +13,12 @@ use crate::compression::lz4::lz4_decompression_module::Lz4DecompressionModule;
 /// When doing compression, the client will get to choose the compression module, this behaviour can be changed by overiding the handler to other
 
 // TODO: Have trait restricted to read write.
-pub trait CompressorModule<R: Read, W: Write>: Sized {
+pub trait CompressorModule<R, W>
+where
+    Self: Sized,
+    R:Read,
+    W:Write
+{
     type Error: Debug;
 
     ///
@@ -38,7 +43,7 @@ pub trait CompressorModule<R: Read, W: Write>: Sized {
     fn get_compression_algorithm() -> &'static BucketCompression;
 }
 // TODO: Have trait restricted to read write.
-pub trait DecompressModule<R: Read, W: Write>: Sized {
+pub trait DecompressModule<R, W> where Self: Sized, R:Read, W:Write {
     type Error: Debug;
     fn new(reader: R) -> Self;
     fn decompress_chunk(&mut self, bytes: &mut [u8]) -> Result<(), Self::Error>;
@@ -47,7 +52,10 @@ pub trait DecompressModule<R: Read, W: Write>: Sized {
 }
 
 /// Decide which compression algorithm/decompression is used
-pub trait CompressionChooserHandling<R: Read, W: Write> {
+pub trait CompressionChooserHandling<R, W> where
+    R: Read,
+    W:Write
+{
     fn chose_compression_handler(
         writer: W,
         bucket_compression: Option<BucketCompression>,

@@ -7,18 +7,20 @@ use tokio_tungstenite_wasm::{Message, WebSocketStream};
 use url::Url;
 use crate::token::ApiToken;
 
-pub trait WebhookEventHandler: Sized {
+pub trait WebhookEventHandler where Self: Sized {
     fn handle_webhook_event(&self, event: &WebhookEvents) -> Result<(), Infallible>;
 }
 
-pub trait WebhookConnector<WH: WebhookEventHandler>: Sized {
+pub trait WebhookConnector<WH>
+where
+    Self: Sized,
+    WH: WebhookEventHandler {
     async fn connect(
         url: Url,
         api_token: ApiToken,
         webhook_signature_scheme: WebhookSignatureScheme,
         event_handler: WH,
     ) -> Result<Self, Infallible>;
-
 }
 
 pub struct WebhookClient<WH: WebhookEventHandler> {

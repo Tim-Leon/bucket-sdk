@@ -5,8 +5,7 @@ use std::sync::Arc;
 use std::{io::Write, os::unix::prelude::FileExt, str::FromStr};
 use std::io::Read;
 use tonic::async_trait;
-
-use crate::io::file::FileWrapper;
+use crate::io::FileWrapper;
 
 #[derive(Clone)]
 pub struct NativeFile {

@@ -1,14 +1,16 @@
+use std::io::{Read, Write};
 use bucket_common_types::{BucketCompression, BucketEncryption, BucketGuid};
+use generic_array::ArrayLength;
 use zero_knowledge_encryption::encryption::aead::EncryptionModule;
 use crate::compression::CompressorModule;
-use crate::wrapper::bucket::upload::FileUploadHandlerBuilder;
+use crate::wrapper::bucket::upload::{FileUploadHandler, FileUploadHandlerBuilder};
 
 pub struct DefaultFileUploadHandlerBuilder {
 
 }
 
-impl FileUploadHandlerBuilder for DefaultFileUploadHandlerBuilder {
-    type OutputType = ();
+impl<R: Read,W: Write, N: ArrayLength> FileUploadHandlerBuilder<R, W, N> for DefaultFileUploadHandlerBuilder {
+    type OutputType = FileUploadHandler<R, W, Error=()>;
 
     fn new(target: BucketGuid, bucket_compression: Option<BucketCompression>, bucket_encryption: Option<BucketEncryption>, use_client_compression: bool) -> Self {
         todo!()

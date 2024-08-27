@@ -1,9 +1,6 @@
 use crate::compression::DecompressModule;
 use bucket_common_types::BucketCompression;
-use prost::bytes::Bytes;
-use std::io;
 use std::io::{Read, Write};
-use tokio::io::AsyncWriteExt;
 
 pub struct Lz4DecompressionModule<R: Read> {
     pub decoder: lz4_flex::frame::FrameDecoder<R>,
@@ -15,7 +12,7 @@ pub enum Lz4DecompressionError {
     IoError,
 }
 
-impl<R: io::Read, W: io::Write> DecompressModule<R, W> for Lz4DecompressionModule<R> {
+impl<R: Read, W: Write> DecompressModule<R, W> for Lz4DecompressionModule<R> {
     type Error = Lz4DecompressionError;
 
     fn new(reader: R) -> Self {

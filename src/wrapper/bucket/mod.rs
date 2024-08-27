@@ -9,12 +9,16 @@ use mime::Mime;
 use tonic::Request;
 use url::Url;
 use zero_knowledge_encryption::encryption::aead::EncryptionModule;
-use crate::client::http::HttpUploadClientExt;
-use crate::compression::CompressorModule;
+use crate::client::http::{HttpDownloadClientExt, HttpUploadClientExt};
+use crate::compression::{CompressionChooserHandling, CompressorModule};
+use crate::dto::bucket::DownloadFilesParams;
+use crate::encryption::EncryptionChooserHandler;
+use crate::io::FileWrapper;
 use crate::wrapper::bucket::bucket::{DownloadFilesFromBucketError};
 use crate::wrapper::bucket::errors::{DeleteFileInBucketError, DownloadError, GetFilesystemDetailsError, MoveFilesInBucketError, UploadError, UploadToUrlError};
-use crate::wrapper::bucket::upload::BucketFileUploadHandler;
+use crate::wrapper::bucket::upload::FileUploadHandler;
 use crate::token::ApiToken;
+use crate::wrapper::bucket::download::FileDownloadHandlerBuilder;
 
 pub mod bucket;
 pub mod errors;
@@ -23,40 +27,34 @@ pub mod upload;
 
 pub trait ClientUploadExt {
     /// Note: THe api token need to be set for the request in order for it to work.
-    async fn upload_files_to_bucket_raw<R: std::io::Read, W: std::io::Write, UH: BucketFileUploadHandler<R, W>, HTTP: HttpUploadClientExt>(
+    async fn upload_files_to_bucket_raw<R: Read, W: Write, UH: FileUploadHandler<R, W>, HTTP: HttpUploadClientExt>(
         &mut self,
         req: tonic::Request<UploadFilesToBucketRequest>,
         upload_handler: UH,
+        api_token: &ApiToken,
         http_client: HTTP,
     ) -> Result<(), UploadError>;
-    async fn download_from_url_raw<R, W, T>(
+    async fn download_from_url_raw<R: Read, W: Write, N: ArrayLength, HTTP: HttpDownloadClientExt, CCH: CompressionChooserHandling<R, W>, ECH:EncryptionChooserHandler<R, W, N>,FDHB: FileDownloadHandlerBuilder<R, W, N, HTTP, CCH, ECH>>(
         &mut self,
         api_token: &ApiToken,
         url: ExclusiveShareLink,
         hashed_password: Option<String>,
         format: Option<DownloadFormat>,
-        //download_handler: DH,
-        create_download_handler: impl CreateFileDownloadHandler<R, W, T>,
-        additional_param: Rc<T>,
-    ) -> Result<(), DownloadError>;
+        create_download_handler: FDHB,
+    )    -> Result<(), DownloadError>;
 
-    async fn download_files_from_bucket_raw<R, W, T>(
+    async fn download_files_from_bucket_raw<R: Read,W: Write, N: ArrayLength,HTTP: HttpDownloadClientExt,CCH: CompressionChooserHandling<R, W>, ECH: EncryptionChooserHandler<R, W, N>,FDHB: FileDownloadHandlerBuilder<R, W, N,HTTP, CCH, ECH>>(
         &mut self,
-        req: tonic::Request<DownloadFilesRequest>,
-        // Hook function to provide which file to write to.
-        create_file_download_handler_hook: impl CreateFileDownloadHandler<R, W, T>,
-        api_token: &ApiToken,
-        keep_file_structure: bool,
-        additional_param: Rc<T>,
-    ) -> Result<(), DownloadFilesFromBucketError>;
+        param: DownloadFilesParams,
+        file_download_handler_builder: FDHB
+    )  -> Result<(), DownloadFilesFromBucketError>;
 
-    async fn download_bucket_raw<R, W, T>(
+    async fn download_bucket_raw<R: Read, W: Write, N: ArrayLength, HTTP: HttpDownloadClientExt, CCH: CompressionChooserHandling<R, W>, ECH: EncryptionChooserHandler<R, W, N>, FDHB: FileDownloadHandlerBuilder<R, W, N, HTTP, CCH, ECH>>(
         &mut self,
         req: tonic::Request<DownloadBucketRequest>,
-        keep_file_structure: bool, // Will keep the same file structure as on the server. This means directory/directory containing the file
-        //download_handler: &mut BucketFileWriter,
-        create_download_handler: impl CreateFileDownloadHandler<R, W, T>,
-        additional_param: Rc<T>,
+        keep_file_structure: bool,
+        download_handler_builder: FDHB,
+        api_token: &ApiToken,   http_client: HTTP,
     ) -> Result<Vec<String>, DownloadError>;
     /*
      * Upload to pre-signed url using PUT.

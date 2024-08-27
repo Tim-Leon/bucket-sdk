@@ -1,21 +1,24 @@
 use std::rc::Rc;
 use bucket_api::backend_api;
 use bucket_api::backend_api::{CreateBucketResponse, DeleteAccountResponse, DeleteBucketResponse, DeleteFilesInBucketResponse, GetAccountDetailsResponse, GetBucketDetailsResponse, GetBucketFilestructureResponse, MoveFilesInBucketResponse, UpdateAccountResponse, UpdateBucketResponse};
+use generic_array::ArrayLength;
 use tonic::transport::Uri;
 use crate::api::authentication::{LoginError, RegistrationError};
 use crate::client::grpc::native::client::query_client::QueryClient;
 use crate::client::http::{HttpDownloadClientExt, HttpUploadClientExt};
-use crate::wrapper::bucket::bucket::{CreateFileDownloadHandler, DownloadFilesFromBucketError};
+use crate::compression::CompressionChooserHandling;
+use crate::wrapper::bucket::bucket::{ DownloadFilesFromBucketError};
 use crate::wrapper::bucket::errors::{DownloadError, UploadError};
 use crate::io::FileWrapper;
-use crate::wrapper::bucket::upload::BucketFileUploadHandler;
+use crate::wrapper::bucket::upload::FileUploadHandler;
 use crate::dto::account::{DeleteAccountParams, DeleteAccountParamsParsingError, GetAccountDetailsParams, GetAccountDetailsParamsParsingError, UpdateAccountParams, UpdateAccountParamsParsingError};
 use crate::dto::authentication::{LoginParams, RegistrationParams};
 use crate::dto::bucket::{CreateBucketParams, CreateBucketParamsParsingError, DeleteBucketParams, DeleteFilesInBucketParams, DeleteFilesInBucketParamsParsingError, DownloadBucketParams, DownloadBucketParamsParsingError, DownloadFilesParams, DownloadFilesParamsParsingError, GetBucketDetailsParams, GetBucketDetailsRequestParsingError, GetFilesystemDetailsParams, GetFilesystemDetailsParamsParsingError, MoveFilesInBucketParams, MoveFilesInBucketRequestParsingError, ParseDeleteBucketRequestError, UpdateBucketParams, UpdateBucketParamsParsingError, UploadFilesParams, UploadFilesRequestParsingError};
 use crate::dto::checkout::CreateCheckoutParamsParsingError;
 use crate::dto::sharing::CreateBucketShareLinkParamsParsingError;
+use crate::encryption::EncryptionChooserHandler;
 use crate::token::ApiToken;
-
+use crate::wrapper::bucket::download::FileDownloadHandlerBuilder;
 
 pub mod authentication;
 
@@ -47,18 +50,16 @@ pub trait ClientBucketExt<R: std::io::Read, W: std::io::Write> {
     async fn upload_files_to_bucket<File: FileWrapper,HTTP: HttpUploadClientExt>(
         &mut self,
         param: UploadFilesParams<File>,
-        upload_file_handler: impl BucketFileUploadHandler<R, W>,
+        upload_file_handler: impl FileUploadHandler<R, W>,
         http_client: HTTP,
     ) -> Result<(), BucketApiError>;
     ///https://repost.aws/questions/QUxynkZDbASDaqrUcpx_sILQ/s3-support-multiple-byte-ranges-download
-    async fn download_files_from_bucket<T>(
+    async fn download_files_from_bucket<N: ArrayLength,HTTP: HttpDownloadClientExt, CCH: CompressionChooserHandling<R, W>, ECH: EncryptionChooserHandler<R, W, N>, FDHB: FileDownloadHandlerBuilder<R,W,N,HTTP, CCH, ECH>>(
         &mut self,
         param: DownloadFilesParams,
         //file_handle: BucketFileTrait<Error = BucketFileError, FileHandle = FileHandle>,
         // Hook function will take in the details for the file and either return a WebBucketFile or NativeBucketFile depending on enviorment implementation, diffrent between WASM and NATIVE.
-        create_file_download_handler: impl CreateFileDownloadHandler<R, W, T>,
-        //file_choser: T where T impl (VirtualFileDetails, String) -> VirtualBucketFile,
-        additional_param: Rc<T>,
+        create_file_download_handler: FDHB,
     ) -> Result<(), BucketApiError>;
 
     ///
@@ -76,11 +77,10 @@ pub trait ClientBucketExt<R: std::io::Read, W: std::io::Write> {
     /// ```
     ///
     /// ```
-    async fn download_bucket<T, HTTP: HttpDownloadClientExt>(
+    async fn download_bucket<N:ArrayLength,HTTP: HttpDownloadClientExt,CCH: CompressionChooserHandling<R, W>, ECH: EncryptionChooserHandler<R, W, N>, FDHB: FileDownloadHandlerBuilder<R, W,N, HTTP, CCH, ECH>>(
         &mut self,
         param: DownloadBucketParams,
-        create_file_download_handler: impl CreateFileDownloadHandler<R, W, T>,
-        additional_param: Rc<T>,
+        file_download_handler_builder: FDHB,
         http_client: HTTP,
     ) -> Result<Vec<String>, BucketApiError>;
 

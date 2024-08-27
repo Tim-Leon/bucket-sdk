@@ -1,14 +1,22 @@
+use std::io::{Read, Write};
 use std::rc::Rc;
 use bucket_api::backend_api;
 use bucket_api::backend_api::{CreateBucketRequest, CreateBucketResponse, DeleteBucketRequest, DeleteBucketResponse, DeleteFilesInBucketRequest, DeleteFilesInBucketResponse, DownloadBucketRequest, DownloadFilesRequest, File, GetBucketDetailsRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest, GetBucketFilestructureResponse, MoveFilesInBucketRequest, MoveFilesInBucketResponse, UpdateBucketRequest, UpdateBucketResponse, UploadFilesToBucketRequest};
+use generic_array::ArrayLength;
 use tonic::{IntoRequest, Request};
 use crate::api::{BucketApiError, BucketClient};
 use crate::client::http::{HttpDownloadClientExt, HttpUploadClientExt};
 use crate::dto::bucket::{CreateBucketParams, DeleteBucketParams, DeleteFilesInBucketParams, DownloadBucketParams, DownloadFilesParams, GetBucketDetailsParams, GetFilesystemDetailsParams, MoveFilesInBucketParams, UpdateBucketParams, UploadFilesParams};
 use crate::client::grpc::request_ext::RequestAuthorizationMetadataExt;
+use crate::compression::CompressionChooserHandling;
+use crate::encryption::EncryptionChooserHandler;
+use crate::io::FileWrapper;
 use crate::token::ContinuationToken;
-use crate::wrapper::bucket::upload::BucketFileUploadHandler;
+use crate::wrapper::bucket::bucket::DownloadFilesFromBucketError;
+use crate::wrapper::bucket::upload::FileUploadHandler;
 use crate::wrapper::bucket::ClientUploadExt;
+use crate::wrapper::bucket::download::FileDownloadHandlerBuilder;
+
 impl<R: std::io::Read, W: std::io::Write> crate::api::ClientBucketExt<R, W> for BucketClient {
     async fn create_bucket(
         &mut self,
@@ -59,45 +67,42 @@ impl<R: std::io::Read, W: std::io::Write> crate::api::ClientBucketExt<R, W> for 
     async fn upload_files_to_bucket<File : FileWrapper, HTTP: HttpUploadClientExt>(
         &mut self,
         param: UploadFilesParams<File>,
-        upload_file_handler: impl BucketFileUploadHandler<R, W>,
+        upload_file_handler: impl FileUploadHandler<R, W>,
         http_client: HTTP,
     ) -> Result<(), BucketApiError> {
         let uftbr: UploadFilesToBucketRequest = param.try_into().unwrap();
         let mut req = Request::new(uftbr);
         req.set_authorization_metadata(&self.api_token);
         self.client
-            .upload_files_to_bucket_raw(req, upload_file_handler, http_client)
+            .upload_files_to_bucket_raw(req, upload_file_handler,&self.api_token, http_client)
             .await?;
         Ok(())
     }
 
-    async fn download_files_from_bucket<T>(
+    async fn download_files_from_bucket<N: ArrayLength,HTTP: HttpDownloadClientExt,CCH: CompressionChooserHandling<R, W>, ECH: EncryptionChooserHandler<R, W, N>,FDHB: FileDownloadHandlerBuilder<R, W, N,HTTP, CCH, ECH, >>(
         &mut self,
         param: DownloadFilesParams,
-        create_file_download_handler: impl CreateFileDownloadHandler<R, W, T>,
-        additional_param: Rc<T>,
-    ) -> Result<(), BucketApiError> {
+        file_download_handler_builder: FDHB
+    )  -> Result<(), DownloadFilesFromBucketError> {
         let keep_file_structure = param.keep_file_structure;
-        let dfr: DownloadFilesRequest = param.try_into()?;
+        let dfr: DownloadFilesRequest = param.try_into().unwrap();
         let mut req = Request::new(dfr);
         req.set_authorization_metadata(&self.api_token);
         self.client
-            .download_files_from_bucket_raw::<R, W, T>(
+            .download_files_from_bucket_raw::<R, W, N, HTTP, CCH, ECH, FDHB>(
                 req,
-                create_file_download_handler,
+                file_download_handler_builder,
                 &self.api_token,
                 keep_file_structure,
-                additional_param,
             )
             .await?;
         Ok(())
     }
 
-    async fn download_bucket<T, HTTP: HttpDownloadClientExt>(
+    async fn download_bucket<N:ArrayLength,HTTP: HttpDownloadClientExt,CCH: CompressionChooserHandling<R, W>, ECH: EncryptionChooserHandler<R, W, N>, FDHB: FileDownloadHandlerBuilder<R, W, N,HTTP, CCH, ECH>>(
         &mut self,
         param: DownloadBucketParams,
-        create_file_download_handler: impl CreateFileDownloadHandler<R, W, T>,
-        additional_param: Rc<T>,
+        file_download_handler_builder: FDHB,
         http_client: HTTP,
     ) -> Result<Vec<String>, BucketApiError> {
         let keep_file_structure = param.keep_file_structure;
@@ -106,13 +111,7 @@ impl<R: std::io::Read, W: std::io::Write> crate::api::ClientBucketExt<R, W> for 
         req.set_authorization_metadata(&self.api_token);
         let resp = self
             .client
-            .download_bucket_raw(
-                req,
-                keep_file_structure,
-                create_file_download_handler,
-                additional_param,
-                http_client
-            )
+            .download_bucket_raw::<R, W, N, HTTP, CCH, ECH, FDHB>(req, keep_file_structure, file_download_handler_builder, &self.api_token ,http_client)
             .await
             .unwrap();
         Ok(resp)
@@ -187,6 +186,6 @@ impl<R: std::io::Read, W: std::io::Write> crate::api::ClientBucketExt<R, W> for 
             None => return Err(BucketApiError::EmptyFilesystem),
         };
         let continuation_token = resp.continuation_token;
-        Ok((files, ))
+        Ok((files, continuation_token ))
     }
 }

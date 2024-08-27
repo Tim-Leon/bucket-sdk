@@ -8,12 +8,15 @@ Explore our codebase and leverage the powerful functionalities offered by Bucket
 
 ## Features
 - Native API (GRPC)
-- S3
+- S3(Later)
 - Zero Knowledge Encryption
-- Signature Validation
+- Signature Validation(Later)
 - Virtual Filesystem (Under Development)
-- 
-
+- Client side Modular Encryption and Compression modules, with server side support also. 
+- Chose the encryption and compression.
+- Webhook support
+- Logging 
+- File Sharing fully either secrete with zero knowledge, or sharing. 
 
 # 
 
@@ -21,7 +24,6 @@ Explore our codebase and leverage the powerful functionalities offered by Bucket
 - dto: Parsing for parameter when using the higher level api.
 - wrapper: Raw request api. 
 - client: The different clients supported. currently request or gloo.
-- 
 
 ## TODO: 
 - Add logging for information gathering
@@ -33,11 +35,13 @@ Explore our codebase and leverage the powerful functionalities offered by Bucket
 - mock
 - make sure backend and client work in harmony
 - TODO: Instead of using type to decide which filestore to use, use trait and have the implementaion accept any struct that implements that trait. 
+- fuzzing.
 
 Each upload and download creates an upload-/download-handler. 
 The upload-/download-handler includes, compression, filehandle,  
 
 this handler is a trait that already have implementation for filesystem, other implementations will support AWS, Google cloud and other sources to upload from and support for zero knowledge encryption. 
+
 
 BucketFileDownloadHandler
 BucketFileUploadHandler
@@ -53,8 +57,8 @@ Each module is defined as a trait, a developer can implement other algorithms ov
 
 
 The upload process starts with a protobuf request asking to upload X files, with the number of bytes, this amount of storage is guaranteed for the duration of the upload to be available to the user.  
-after the successful request, a response is set containing a list of URLs that correspond to a file upload. The bytes are then sent to the URL for each file, note that the size can not be changed and it's up to the client to fill the compleate request. 
-the upload support being parallel. 
+After the successful request, a response is set containing a list of URLs that correspond to a file upload. The bytes are then sent to the URL for each file, note that the size can not be changed and it's up to the client to fill the compleate request. 
+The upload support is parallel. 
 
 
 # Navigation Url's

@@ -123,7 +123,7 @@ impl AuthenticationClientExt for QueryClient {
         let start_req = CreateAccountStartRequest {
             email: param.email_address.to_string(),
             oprf: oprf_start.message.serialize().to_vec(),
-            captcha: param.captcha.to_string(),
+            captcha: param.captcha.0.to_string(),
         };
         let start_resp = self.create_account_start(start_req).await?.into_inner();
 

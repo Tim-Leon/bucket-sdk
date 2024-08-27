@@ -1,53 +1,53 @@
-use bucket_api::backend_api::{DeleteFilesInBucketRequest, DeleteFilesInBucketResponse, File, GetBucketDetailsFromUrlRequest, GetBucketDetailsFromUrlResponse, GetBucketDetailsRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest, GetBucketFilestructureResponse, MoveFilesInBucketRequest, MoveFilesInBucketResponse};
+use crate::client::grpc::native::client::query_client::QueryClient;
+use crate::client::http::{HttpDownloadClientExt, HttpUploadClientExt};
+use bucket_api::backend_api::{DeleteFilesInBucketRequest, DeleteFilesInBucketResponse, GetBucketDetailsFromUrlRequest, GetBucketDetailsFromUrlResponse, GetBucketDetailsRequest, GetBucketDetailsResponse, GetBucketFilestructureRequest, GetBucketFilestructureResponse, MoveFilesInBucketRequest, MoveFilesInBucketResponse};
 use bucket_api::backend_api::{
     DownloadBucketRequest, DownloadFilesRequest, UploadFilesToBucketRequest,
 };
 use bucket_common_types::exclusive_share_link::ExclusiveShareLink;
 use bucket_common_types::share_link::ShareLink;
-use bucket_common_types::{DownloadFormat, Encoding};
-use std::error::Error;
-use std::fmt::Debug;
-use std::io::{Read, Write};
-use std::rc::Rc;
+use bucket_common_types::{BucketGuid, DownloadFormat, Encoding};
 use byte_unit::Byte;
 use futures::io::BufReader;
 use futures::AsyncReadExt;
 use futures::StreamExt;
-use generic_array::ArrayLength;
 use mime::Mime;
+use std::error::Error;
+use std::fmt::Debug;
+use std::io::{Read, Write};
+use std::rc::Rc;
+use bucket_common_types::bucket_search_query::UuidStringUnion::Uuid;
+use generic_array::ArrayLength;
 use tonic::{IntoRequest, Request, Status};
 use url::Url;
 use zero_knowledge_encryption::encryption::aead::EncryptionModule;
-use crate::client::grpc::native::client::query_client::QueryClient;
-use crate::client::http::{HttpDownloadClientExt, HttpUploadClientExt};
 //use tokio::io::BufReader;
 
 //use tokio_stream::StreamExt;
 
+use crate::compression::{CompressionChooserHandling, CompressorModule};
 use crate::token::ApiToken;
-use crate::compression::CompressorModule;
-use crate::wrapper::bucket::ClientUploadExt;
 use crate::wrapper::bucket::download::{FileDownloadHandler, FileDownloadHandlerBuilder};
 use crate::wrapper::bucket::errors::{
     DeleteFileInBucketError, DownloadError, FailedFilePaths, GetFilesystemDetailsError,
     MoveFilesInBucketError, UploadError, UploadToUrlError,
 };
+use crate::wrapper::bucket::ClientUploadExt;
 
-use crate::wrapper::bucket::download::download_handler::BucketDownloadHandlerErrors;
-use crate::io::file::{ VirtualFileDetails};
-use crate::client::http::http_request_ext::{
-    HttpRequestAuthorizationMetadataExt, HttpRequestContentEncodingHeaderExt,
-    HttpRequestContentTypeHeaderExt,
-};
-use crate::wrapper::bucket::upload::BucketFileUploadHandler;
 use crate::client::grpc::request_ext::RequestAuthorizationMetadataExt;
+use crate::client::http::native::http::HttpClient;
+use crate::encryption::EncryptionChooserHandler;
+use crate::io::file::VirtualFileDetails;
+use crate::wrapper::bucket::download::download_handler::BucketDownloadHandlerErrors;
+use crate::wrapper::bucket::upload::FileUploadHandler;
 
 
 impl ClientUploadExt for QueryClient {
-    async fn upload_files_to_bucket_raw<R: std::io::Read, W: std::io::Write, UH: BucketFileUploadHandler<R, W>, HTTP: HttpUploadClientExt>(
+    async fn upload_files_to_bucket_raw<R: std::io::Read, W: std::io::Write, UH: FileUploadHandler<R, W>, HTTP: HttpUploadClientExt>(
         &mut self,
         req: tonic::Request<UploadFilesToBucketRequest>,
         mut upload_handler: UH,
+        api_token: &ApiToken,
         http_client: HTTP,
     ) -> Result<(), UploadError> {
         let total_upload_size: u64 = req
@@ -88,6 +88,7 @@ impl ClientUploadExt for QueryClient {
                         chunk_size,
                         &mut upload_handler,
                         mime::APPLICATION_OCTET_STREAM,
+                        api_token,
                         None,
                         http_client
                     )
@@ -103,15 +104,14 @@ impl ClientUploadExt for QueryClient {
         Ok(())
     }
 
-    async fn download_from_url_raw<R, W, T>(
+    async fn download_from_url_raw<R, W, N, HTTP: HttpDownloadClientExt, CCH: CompressionChooserHandling<R, W>, ECH:EncryptionChooserHandler<R, W, N>,FDHB: FileDownloadHandlerBuilder<R, W,N, HTTP, CCH, ECH>>(
         &mut self,
         api_token: &ApiToken,
         url: ExclusiveShareLink,
         hashed_password: Option<String>,
         format: Option<DownloadFormat>,
-        create_download_handler: impl CreateFileDownloadHandler<R, W, T>,
-        additional_param: Rc<T>,
-    ) -> Result<(), DownloadError> {
+        create_download_handler: FDHB,
+    )    -> Result<(), DownloadError> {
         let bucket_details = match url {
             //(user_id, bucket_id)
             ExclusiveShareLink::ShareLink(share) => {
@@ -162,18 +162,17 @@ impl ClientUploadExt for QueryClient {
         let mut req = Request::new(bucket_download_req);
         req.set_authorization_metadata(api_token);
 
-        self.download_bucket_raw(req, true, create_download_handler, additional_param)
+        self.download_bucket_raw(req, true, create_download_handler)
             .await?;
         Ok(())
     }
 
-    async fn download_files_from_bucket_raw<R, W, T>(
+    async fn download_files_from_bucket_raw<R: Read,W: Write, N: ArrayLength,HTTP: HttpDownloadClientExt,CCH: CompressionChooserHandling<R, W>, ECH: EncryptionChooserHandler<R, W, N>,FDHB: FileDownloadHandlerBuilder<R, W, N,HTTP, CCH, ECH>>(
         &mut self,
         req: tonic::Request<DownloadFilesRequest>,
-        create_file_download_handler_hook: impl CreateFileDownloadHandler<R, W, T>,
+        file_download_handler_builder: FDHB,
         api_token: &ApiToken,
         keep_file_structure: bool,
-        additional_param: Rc<T>,
     ) -> Result<(), DownloadFilesFromBucketError> {
         let mut resp_stream = self.download_files(req).await.unwrap().into_inner();
 
@@ -188,15 +187,14 @@ impl ClientUploadExt for QueryClient {
                             //file_format: mime::Mime::from_str(file.file_format.as_str())?,
                         };
 
-                        let mut download_handler = create_file_download_handler_hook.handle(
+                        let mut download_handler = file_download_handler_builder.handle(
                             virtual_detail,
                             keep_file_structure,
-                            additional_param.clone(),
                         );
                         let url = url::Url::parse(file.download_url.as_str()).unwrap();
                         let mut size_left_in_bytes = file.file_size_in_bytes;
                         while size_left_in_bytes > 0 {
-                            donwload_from_url(
+                            download_from_url(
                                 &url,
                                 &mut size_left_in_bytes,
                                 &mut download_handler,
@@ -219,23 +217,27 @@ impl ClientUploadExt for QueryClient {
         Ok(())
     }
 
-    async fn download_bucket_raw<R, W, T, HTTP: HttpDownloadClientExt>(
+    async fn download_bucket_raw<R: Read, W: Write, N: ArrayLength, HTTP: HttpDownloadClientExt, CCH: CompressionChooserHandling<R, W>, ECH: EncryptionChooserHandler<R, W, N>, FDHB: FileDownloadHandlerBuilder<R, W, N, HTTP, CCH, ECH>>(
         &mut self,
         req: tonic::Request<DownloadBucketRequest>,
         keep_file_structure: bool,
-        download_handler_builder: impl FileDownloadHandlerBuilder,
-
-        api_token: &ApiToken,
-        http_client: HTTP,
+        download_handler_builder: FDHB,
+        api_token: &ApiToken,   http_client: HTTP,
     ) -> Result<Vec<String>, DownloadError> {
+
+        let bucket_owner_id = uuid::Uuid::try_parse(req.get_ref().bucket_owner_id.as_str());
+        let bucket_id = uuid::Uuid::try_parse(req.get_ref().bucket_id.as_str());
+        let bucket_guid = BucketGuid::new(bucket_owner_id.unwrap(), bucket_id.unwrap());
+
         let resp = self.download_bucket(req).await.unwrap();
+        let target_path ;
         let mut res = resp.into_inner();
         let msg = res.message().await.unwrap().unwrap();
         for file in &msg.file.unwrap().filepaths {
             let url = url::Url::parse(file.download_url.as_str()).unwrap();
-            let builder = FileDownloadHandlerBuilder::new(url);
-            download_handler_builder::new()
-            let content_encoding= ;
+            let mut builder = FileDownloadHandlerBuilder::new(&bucket_guid,api_token,&target_path,&url, &http_client);
+
+            let content_encoding= req.get_ref().format.unwrap();
             let http_resp = http_client.get(url, api_token,content_encoding).await.unwrap();
             let virtual_file = VirtualFileDetails {
                 path: file.file_path.clone(),
@@ -243,10 +245,10 @@ impl ClientUploadExt for QueryClient {
                 size_in_bytes: file.file_size_in_bytes,
                 //file_format: mime::Mime::from_str(file.file_format.as_str())?,
             };
+
             let mut download_handler = create_download_handler.handle(
                 virtual_file,
                 keep_file_structure,
-                additional_param.clone(),
             );
             download_handler.on_download_chunk(&resp_bin).await.unwrap();
             //.map_err(|err| -> DownloadError {DownloadError::from(err)})?;
@@ -254,17 +256,18 @@ impl ClientUploadExt for QueryClient {
         Ok(Vec::new())
     }
 
-    async fn upload_to_url_raw<R: std::io::Read,W: std::io::Write,UH: BucketFileUploadHandler<R,W>, HTTP: HttpUploadClientExt>(
+    async fn upload_to_url_raw<R: std::io::Read,W: std::io::Write,UH: FileUploadHandler<R,W>, HTTP: HttpUploadClientExt>(
         url: &Url,
         chunk_size: u64,
         upload_handler: &mut UH,
         content_type: Mime,
+        api_token: &ApiToken,
         content_encoding: Option<Encoding>,
         http_client: HTTP,
     ) -> Result<u16, UploadToUrlError>
     {
         let file_chunk = upload_handler.on_upload_chunk(chunk_size).await.unwrap();
-        let resp = http_client.put(url.clone(), file_chunk.as_slice(), content_type, content_encoding).await.unwrap();
+        let resp = http_client.put(url.clone(), file_chunk.as_slice(), api_token,content_type, content_encoding).await.unwrap();
         Ok()
     }
 
@@ -353,15 +356,14 @@ pub enum DownloadFromUrlError {
 }
 
 /// Uses HTTP client.
-pub async fn donwload_from_url<R, W, HTTP: HttpDownloadClientExt>(
+pub async fn download_from_url<R, W, N, HTTP: HttpDownloadClientExt, CCH: CompressionChooserHandling<R, W>, ECH: EncryptionChooserHandler<R, W, N>, FDHB: FileDownloadHandlerBuilder<R, W, N, HTTP, CCH, ECH>>(
     url: &url::Url,
     size_left_in_bytes: &mut u64,
-    download_handler: &mut impl FileDownloadHandlerBuilder<HTTP>,
+    download_handler: &mut FDHB,
     api_token: &ApiToken,
 ) -> Result<u16, DownloadFromUrlError> {
     //https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateMultipartUpload.html
 
-    http_client.get(url, api_token, content_encoding).await;
 
     if !resp.ok() {
         return Err(DownloadFromUrlError::HttpResponseStatusError(resp.status()));

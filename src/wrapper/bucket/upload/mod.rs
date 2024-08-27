@@ -1,17 +1,20 @@
 use std::fmt::Debug;
+use std::io::{Read, Write};
 use async_trait::async_trait;
 use bucket_common_types::{BucketCompression, BucketEncryption, BucketGuid};
 use generic_array::ArrayLength;
 use zero_knowledge_encryption::encryption::aead::EncryptionModule;
 use crate::compression::CompressorModule;
-use crate::io::file::FileWrapper;
+use crate::io::FileWrapper;
+use crate::token::ApiToken;
 
 pub mod upload_handler;
 pub mod file_upload_handler_builder;
 
-pub trait FileUploadHandlerBuilder {
+pub trait FileUploadHandlerBuilder<R: Read,W: Write,N: ArrayLength> {
     type OutputType;
     fn new(target: BucketGuid,
+           api_token: &ApiToken,
            bucket_compression: Option<BucketCompression>,
            bucket_encryption: Option<BucketEncryption>,
            use_client_compression: bool) -> Self;
@@ -23,7 +26,7 @@ pub trait FileUploadHandlerBuilder {
 
 // A handler is created for each file upload. And will have multiple handlers running in parallel.
 #[async_trait(?Send)]
-pub trait BucketFileUploadHandler<R: std::io::Read, W: std::io::Write>: Sized {
+pub trait FileUploadHandler<R: std::io::Read, W: std::io::Write>: Sized {
     // : Send + Sync
     type Error: Debug;
 

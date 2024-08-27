@@ -1,3 +1,6 @@
+#![feature(slice_pattern)]
+extern crate core;
+
 pub mod api;
 pub mod client;
 pub mod constants;

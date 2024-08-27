@@ -1,12 +1,12 @@
-use std::io::{Bytes, Read};
-use bucket_common_types::Encoding;
-use futures::{SinkExt, StreamExt};
-use mime::Mime;
-use reqwest::Client;
-use url::Url;
-use crate::client::http::{HttpDownloadClientExt, HttpUploadClientExt};
 use crate::client::http::http_request_ext::{HttpRequestAuthorizationMetadataExt, HttpRequestContentEncodingHeaderExt, HttpRequestContentTypeHeaderExt};
+use crate::client::http::{HttpDownloadClientExt, HttpUploadClientExt};
 use crate::token::ApiToken;
+use bucket_common_types::Encoding;
+use futures::SinkExt;
+use mime::Mime;
+use reqwest::{Client, Error};
+use std::io::{Bytes, Read};
+use url::Url;
 
 pub struct HttpClient {
     client: Client,
@@ -15,9 +15,9 @@ pub struct HttpClient {
 #[derive(Debug, thiserror::Error)]
 pub enum HttpError {
     #[error("HttpUploadError")]
-    HttpUploadError(#[source] reqwest::Error),
+    HttpUploadError(#[source] Error),
     #[error("HttpDownloadError")]
-    HttpDownloadError(#[source] reqwest::Error),
+    HttpDownloadError(#[source] Error),
 }
 
 impl HttpUploadClientExt for  HttpClient{

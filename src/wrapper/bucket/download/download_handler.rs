@@ -1,5 +1,4 @@
 use crate::compression::{CompressorModule, DecompressModule};
-use crate::io::file::FileWrapper;
 use async_trait::async_trait;
 use bucket_common_types::{BucketCompression, BucketEncryption, Encryption};
 use futures::future::Either;
@@ -9,6 +8,7 @@ use std::marker::PhantomData;
 use uuid::Uuid;
 use zero_knowledge_encryption::encryption::aead::decryption_module::DecryptionError;
 use zero_knowledge_encryption::encryption::aead::DecryptionModule;
+use crate::io::FileWrapper;
 use crate::wrapper::bucket::download::FileDownloadHandler;
 
 #[derive(Debug, thiserror::Error)]
@@ -62,44 +62,6 @@ impl<R: std::io::Read, W: std::io::Write, N: generic_array::ArrayLength, DE: Dec
 {
     type Error = BucketDownloadHandlerErrors;
 
-    fn on_download_start(
-        &mut self,
-        target_bucket_id: Uuid,
-        target_user_id: Uuid,
-        from_directory: String,
-        from_filename: String,
-        encryption: Option<BucketEncryption>,
-        bucket_compression: Option<BucketCompression>,
-        download_size_in_bytes: u64,
-    ) -> Result<(), Self::Error> {
-        //let blob = Blob::from(self.write_target_file.clone());
-        //let bytes = read_as_bytes(&blob).await?;
-        let file = FileWrapper::create_file(from_filename.as_str(), &mime::APPLICATION_OCTET_STREAM);
-        match encryption {
-            None => {}
-            Some(encryption) => {
-
-            }
-        }
-        Ok(())
-    }
-
-    //fn on_download_start(
-    //    &mut self,
-    //    _target_bucket_id: uuid::Uuid,
-    //    _target_user_id: uuid::Uuid,
-    //    _from_directory: String,
-    //    from_filename: String,
-    //    _encryption: Option<BucketEncryption>,
-    //    _download_size_in_bytes: u64,
-    //) -> Result<(), Self::Error> {
-    //    //let blob = Blob::from(self.write_target_file.clone());
-    //    //let bytes = read_as_bytes(&blob).await?;
-    //    let file = BucketFile::new(
-    //        from_filename.as_str(), &mime::APPLICATION_OCTET_STREAM
-    //        );
-    //    Ok(())
-    //}
     // Called when a chunk is downloaded. It's up to the user to decrypt the chunk if the bucket is encrypted, or to save the chunk to a file.
     async fn on_download_chunk(&mut self, chunk: &mut [u8]) -> Result<(), Self::Error> {
         let decompressed_buffer;
